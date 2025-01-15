@@ -1,4 +1,4 @@
-package com.broccolist.data
+package com.broccolist.core.data
 
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.HttpClientEngine

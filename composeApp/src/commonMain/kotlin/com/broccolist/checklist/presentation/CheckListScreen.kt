@@ -1,4 +1,4 @@
-package com.broccolist
+package com.broccolist.checklist.presentation
 
 import BroccolistTheme.BroccolistTheme
 import androidx.compose.animation.AnimatedVisibility
@@ -71,7 +71,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import broccolist.composeapp.generated.resources.Res
 import broccolist.composeapp.generated.resources.broccolist_icon
-import com.broccolist.models.Section
+import com.broccolist.checklist.domain.Section
+import com.broccolist.checklist.domain.SectionItem
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
@@ -80,12 +81,24 @@ import org.koin.compose.viewmodel.koinViewModel
 import kotlin.math.roundToInt
 
 @Composable
-fun App(
-    viewModel: AppViewModel = koinViewModel()
+fun CheckListScreenRoot(
+    viewModel: CheckListViewModel = koinViewModel(),
+) {
+    CheckListScreen(
+        sections = viewModel.sections.collectAsStateWithLifecycle().value,
+        addSection = viewModel::addSection,
+        removeSection = viewModel::removeSection,
+    )
+}
+
+@Composable
+fun CheckListScreen(
+    sections: List<Section>,
+    addSection: (Section) -> Unit,
+    removeSection: (Section) -> Unit,
 ) {
     val drawerState: DrawerState = rememberDrawerState(DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
-    val sections by viewModel.sections.collectAsStateWithLifecycle()
     var swipeInCooldown by remember { mutableStateOf(false) }
 
 //    val systemUiController = rememberSystemUiController()
@@ -242,8 +255,17 @@ fun App(
                         ) {
                             ExtendedFloatingActionButton(
                                 onClick = {
-                                    viewModel.addSection(
-                                        Section(name = "New Section")
+                                    addSection(
+                                        Section(
+                                            name = "New Section",
+                                            items = listOf(
+                                                SectionItem(
+                                                    name = "New Item",
+                                                    isChecked = false
+                                                )
+                                            ),
+                                            id = "id"
+                                        )
                                     )
                                     showItems = false
                                 },
@@ -270,8 +292,17 @@ fun App(
                             }
                             ExtendedFloatingActionButton(
                                 onClick = {
-                                    viewModel.addSection(
-                                        Section(name = "New Section", items = listOf("New Item"))
+                                    addSection(
+                                        Section(
+                                            id = "id",
+                                            name = "New Section",
+                                            items = listOf(
+                                                SectionItem(
+                                                    name = "New Item",
+                                                    isChecked = false
+                                                )
+                                            )
+                                        )
                                     )
                                     showItems = false
                                 },
@@ -329,7 +360,7 @@ fun App(
             ) {
                 items(sections) { section ->
                     ItemSection(
-                        viewModel = viewModel,
+                        removeSection = removeSection,
                         section = section.name,
                         items = section.items,
                         onSwipe = {
@@ -349,9 +380,9 @@ fun App(
 
 @Composable
 private fun ItemSection(
-    viewModel: AppViewModel,
+    removeSection: (Section) -> Unit,
     section: String,
-    items: List<String>,
+    items: List<SectionItem>?,
     onSwipe: () -> Unit = {},
     swipeInCooldown: Boolean = false,
 ) {
@@ -364,7 +395,7 @@ private fun ItemSection(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         SwipeableBox(
-            viewModel = viewModel,
+            removeSection = removeSection,
             colorScheme = colorScheme,
             showItems = showItems,
             onClick = { showItems = !showItems },
@@ -383,14 +414,14 @@ private fun ItemSection(
                 modifier = Modifier
                     .fillMaxWidth()
             ) {
-                items.forEachIndexed { index, item ->
+                items?.forEachIndexed { index, item ->
                     val color = if (index % 2 == 1) {
                         colorScheme.secondaryContainer
                     } else {
                         colorScheme.background
                     }
                     ItemRow(
-                        itemName = item,
+                        itemName = item.name,
                         color = color
                     )
                 }
@@ -401,7 +432,7 @@ private fun ItemSection(
 
 @Composable
 private fun SwipeableBox(
-    viewModel: AppViewModel,
+    removeSection: (Section) -> Unit,
     colorScheme: ColorScheme,
     showItems: Boolean,
     onClick: () -> Unit,
@@ -451,7 +482,16 @@ private fun SwipeableBox(
                         }
                         offsetX += delta
                         if (offsetX < thresholdPx) {
-                            viewModel.removeSection(Section(name = section))
+                            removeSection(Section(
+                                id = "id",
+                                name = section,
+                                items = listOf(
+                                        SectionItem(
+                                            name = "New Item",
+                                            isChecked = false
+                                        )
+                                )
+                            ))
                             onSwipe()
                             offsetX = 0f
                         }
@@ -536,16 +576,98 @@ private fun ItemRow(
 
 @Preview
 @Composable
-fun AppPreview() {
+fun CheckListScreenPreview() {
     BroccolistTheme {
-        App()
+        CheckListScreen(
+            sections = listOf(
+                Section(
+                    id = "id",
+                    name = "Section 1",
+                    items = listOf(
+                        SectionItem(
+                            name = "Item 1",
+                            isChecked = false
+                        ),
+                        SectionItem(
+                            name = "Item 2",
+                            isChecked = true
+                        ),
+                        SectionItem(
+                            name = "Item 3",
+                            isChecked = false
+                        ),
+                    )
+                ),
+                Section(
+                    id = "id",
+                    name = "Section 2",
+                    items = listOf(
+                        SectionItem(
+                            name = "Item 1",
+                            isChecked = false
+                        ),
+                        SectionItem(
+                            name = "Item 2",
+                            isChecked = true
+                        ),
+                        SectionItem(
+                            name = "Item 3",
+                            isChecked = false
+                        ),
+                    )
+                ),
+            ),
+            addSection = { },
+            removeSection = { }
+        )
     }
 }
 
 @Preview
 @Composable
-fun AppDarkPreview() {
+fun CheckListScreenDarkPreview() {
     BroccolistTheme(darkTheme = true) {
-        App()
+        CheckListScreen(
+            sections = listOf(
+                Section(
+                    id = "id",
+                    name = "Section 1",
+                    items = listOf(
+                        SectionItem(
+                            name = "Item 1",
+                            isChecked = false
+                        ),
+                        SectionItem(
+                            name = "Item 2",
+                            isChecked = true
+                        ),
+                        SectionItem(
+                            name = "Item 3",
+                            isChecked = false
+                        ),
+                    )
+                ),
+                Section(
+                    id = "id",
+                    name = "Section 2",
+                    items = listOf(
+                        SectionItem(
+                            name = "Item 1",
+                            isChecked = false
+                        ),
+                        SectionItem(
+                            name = "Item 2",
+                            isChecked = true
+                        ),
+                        SectionItem(
+                            name = "Item 3",
+                            isChecked = false
+                        ),
+                    )
+                ),
+            ),
+            addSection = { },
+            removeSection = { }
+        )
     }
 }

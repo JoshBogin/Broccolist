@@ -1,11 +1,11 @@
-package com.broccolist
+package com.broccolist.checklist.presentation
 
 import androidx.lifecycle.ViewModel
-import com.broccolist.models.Section
+import com.broccolist.checklist.domain.Section
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-class AppViewModel : ViewModel() {
+class CheckListViewModel : ViewModel() {
     private val _sections = MutableStateFlow(listOf<Section>())
     val sections = _sections.asStateFlow()
 
