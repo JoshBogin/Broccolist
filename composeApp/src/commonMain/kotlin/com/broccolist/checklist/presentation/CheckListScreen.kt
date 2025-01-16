@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -61,7 +62,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -100,25 +100,7 @@ fun CheckListScreen(
     val drawerState: DrawerState = rememberDrawerState(DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
     var swipeInCooldown by remember { mutableStateOf(false) }
-
-//    val systemUiController = rememberSystemUiController()
     val colorScheme = MaterialTheme.colorScheme
-    // Determine if we're in dark theme by checking the background color luminance
-    val darkTheme = colorScheme.background.luminance() < 0.5
-
-    // Handle system bars
-//    DisposableEffect(systemUiController, darkTheme) {
-//        systemUiController.setStatusBarColor(
-//            color = colorScheme.primaryContainer,
-//            darkIcons = !darkTheme
-//        )
-//        systemUiController.setNavigationBarColor(
-//            color = colorScheme.background,
-//            darkIcons = !darkTheme,
-//            navigationBarContrastEnforced = false
-//        )
-//        onDispose {}
-//    }
 
     ModalNavigationDrawer(
         drawerContent = {
@@ -182,7 +164,8 @@ fun CheckListScreen(
             }
         },
         drawerState = drawerState,
-        scrimColor = Color.Transparent
+        scrimColor = Color.Transparent,
+        modifier = Modifier.safeDrawingPadding()
     ) {
         Scaffold(
             topBar = {
