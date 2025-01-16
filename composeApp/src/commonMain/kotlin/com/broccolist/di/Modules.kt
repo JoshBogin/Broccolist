@@ -1,7 +1,8 @@
 package com.broccolist.di
 
-import com.broccolist.core.data.HttpClientFactory
+import com.broccolist.app.AppViewModel
 import com.broccolist.checklist.presentation.CheckListViewModel
+import com.broccolist.core.data.HttpClientFactory
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
@@ -12,6 +13,7 @@ val sharedModule = module {
     single { HttpClientFactory.create(get()) }
 
     viewModelOf(::CheckListViewModel)
+    viewModelOf(::AppViewModel)
 //    singleOf(::KtorRemoteBookDataSource).bind<RemoteBookDataSource>()
 //    singleOf(::DefaultBookRepository).bind<BookRepository>()
 //

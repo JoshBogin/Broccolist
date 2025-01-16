@@ -5,6 +5,8 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.lifecycle.ViewModel
 import androidx.navigation.NavBackStackEntry
@@ -20,7 +22,11 @@ import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 @Preview
-fun App() {
+fun App(
+    viewModel: AppViewModel = koinViewModel()
+) {
+    val sessionStatus by viewModel.sessionStatus.collectAsState()
+
     BroccolistTheme(
         darkTheme = isSystemInDarkTheme()
     ) {
@@ -36,10 +42,10 @@ fun App() {
                     exitTransition = { slideOutHorizontally() },
                     popEnterTransition = { slideInHorizontally() }
                 ) {
-                    val viewModel = koinViewModel<CheckListViewModel>()
+                    val checkListViewModel = koinViewModel<CheckListViewModel>()
 
                     CheckListScreenRoot(
-                        viewModel = viewModel,
+                        viewModel = checkListViewModel,
                     )
                 }
             }
