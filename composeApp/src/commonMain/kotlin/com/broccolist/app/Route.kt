@@ -8,5 +8,8 @@ sealed interface Route {
     data object ListGraph: Route
 
     @Serializable
+    data object Login: Route
+
+    @Serializable
     data object CheckList: Route
 }

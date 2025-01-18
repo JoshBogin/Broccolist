@@ -81,7 +81,7 @@ import org.koin.compose.viewmodel.koinViewModel
 import kotlin.math.roundToInt
 
 @Composable
-fun CheckListScreenRoot(
+fun CheckListScreenRoute(
     viewModel: CheckListViewModel = koinViewModel(),
 ) {
     CheckListScreen(

@@ -15,8 +15,10 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
-import com.broccolist.checklist.presentation.CheckListScreenRoot
+import com.broccolist.checklist.presentation.CheckListScreenRoute
 import com.broccolist.checklist.presentation.CheckListViewModel
+import com.broccolist.login.presentation.LoginScreenRoute
+import com.broccolist.login.presentation.LoginViewModel
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -42,10 +44,32 @@ fun App(
                     exitTransition = { slideOutHorizontally() },
                     popEnterTransition = { slideInHorizontally() }
                 ) {
-                    val checkListViewModel = koinViewModel<CheckListViewModel>()
+                    AuthenticatedContent(
+                        sessionStatus = sessionStatus,
+                        navController = navController
+                    ) {
+                        val checkListViewModel = koinViewModel<CheckListViewModel>()
 
-                    CheckListScreenRoot(
-                        viewModel = checkListViewModel,
+                        CheckListScreenRoute(
+                            viewModel = checkListViewModel,
+                        )
+                    }
+                }
+
+                composable<Route.Login>(
+                    exitTransition = { slideOutHorizontally() },
+                    popEnterTransition = { slideInHorizontally() }
+                ) {
+                    val loginViewModel = koinViewModel<LoginViewModel>()
+
+                    // TODO login screen should navigate back to list screen when authenticated
+                    LoginScreenRoute(
+                        viewModel = loginViewModel,
+                        onLoginSuccess = {
+                            navController.navigate(Route.CheckList) {
+                                popUpTo(Route.Login) { inclusive = true }
+                            }
+                        }
                     )
                 }
             }
