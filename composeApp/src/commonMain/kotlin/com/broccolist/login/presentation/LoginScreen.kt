@@ -25,6 +25,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import broccolist.composeapp.generated.resources.Res
 import broccolist.composeapp.generated.resources.broccolist_icon
+import broccolist.composeapp.generated.resources.cd_broccolist_icon
+import broccolist.composeapp.generated.resources.login_subtitle
+import broccolist.composeapp.generated.resources.login_title
 import io.github.jan.supabase.auth.providers.Apple
 import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.compose.auth.ComposeAuth
@@ -35,7 +38,7 @@ import io.github.jan.supabase.compose.auth.composable.rememberSignInWithGoogle
 import io.github.jan.supabase.compose.auth.ui.ProviderButtonContent
 import io.github.jan.supabase.compose.auth.ui.annotations.AuthUiExperimental
 import org.jetbrains.compose.resources.painterResource
-import org.jetbrains.compose.ui.tooling.preview.Preview
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun LoginScreenRoute(
@@ -72,7 +75,7 @@ fun LoginScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    text = "Welcome to Broccolist",
+                    text = stringResource(Res.string.login_title),
                     style = MaterialTheme.typography.titleLarge,
                     fontSize = 28.sp,
                     color = MaterialTheme.colorScheme.primary,
@@ -86,7 +89,7 @@ fun LoginScreen(
                 )
                 Icon(
                     painter = painterResource(Res.drawable.broccolist_icon),
-                    contentDescription = "Broccolist icon",
+                    contentDescription = stringResource(Res.string.cd_broccolist_icon),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(48.dp)
                 )
@@ -101,7 +104,7 @@ fun LoginScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    text = "Please sign in with your provider",
+                    text = stringResource(Res.string.login_subtitle),
                     style = MaterialTheme.typography.titleSmall,
                     fontSize = 16.sp,
                     color = MaterialTheme.colorScheme.onBackground,
@@ -167,7 +170,8 @@ private fun googleSignIn(
 }
 
 @Composable
-private fun appleSignIn( // TODO still need to setup apple oauth in supabase
+private fun appleSignIn( // TODO still need to setup apple oauth in supabase,
+                         //   but this is blocked by apple dev account
     supabaseAuth: ComposeAuth,
     onLoginSuccess: () -> Unit
 ): NativeSignInState {
