@@ -1,11 +1,15 @@
 package com.broccolist.checklist.presentation
 
-import androidx.lifecycle.ViewModel
+import com.broccolist.app.MPViewModel
 import com.broccolist.checklist.domain.Section
+import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-class CheckListViewModel : ViewModel() {
+class CheckListViewModel(
+    private val supabaseClient: SupabaseClient
+) : MPViewModel() {
     private val _sections = MutableStateFlow(listOf<Section>())
     val sections = _sections.asStateFlow()
 
@@ -26,5 +30,14 @@ class CheckListViewModel : ViewModel() {
         }
 
         _sections.value = currentSections
+    }
+
+    suspend fun signOut() {
+        try {
+            supabaseClient.auth.signOut()
+            println("Signed out")
+        } catch (e: Exception) {
+            println("Error during sign out: $e")
+        }
     }
 }

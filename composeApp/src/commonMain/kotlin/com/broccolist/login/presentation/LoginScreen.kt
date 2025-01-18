@@ -1,16 +1,19 @@
 package com.broccolist.login.presentation
 
 import BroccolistTheme.BroccolistTheme
-import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -19,72 +22,175 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.broccolist.core.domain.UserState
-import org.koin.compose.viewmodel.koinViewModel
+import androidx.compose.ui.unit.sp
+import broccolist.composeapp.generated.resources.Res
+import broccolist.composeapp.generated.resources.broccolist_icon
+import io.github.jan.supabase.auth.providers.Apple
+import io.github.jan.supabase.auth.providers.Google
+import io.github.jan.supabase.compose.auth.ComposeAuth
+import io.github.jan.supabase.compose.auth.composable.NativeSignInResult
+import io.github.jan.supabase.compose.auth.composable.NativeSignInState
+import io.github.jan.supabase.compose.auth.composable.rememberSignInWithApple
+import io.github.jan.supabase.compose.auth.composable.rememberSignInWithGoogle
+import io.github.jan.supabase.compose.auth.ui.ProviderButtonContent
+import io.github.jan.supabase.compose.auth.ui.annotations.AuthUiExperimental
+import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @Composable
 fun LoginScreenRoute(
-    viewModel: LoginViewModel = koinViewModel(),
+    supabaseAuth: ComposeAuth,
     onLoginSuccess: () -> Unit
 ) {
     LoginScreen(
-        userState = viewModel.userState.collectAsStateWithLifecycle().value,
-        googleLogin = viewModel::loginWithGoogle,
-        onLoginSuccess = onLoginSuccess
+        onLoginSuccess = onLoginSuccess,
+        supabaseAuth = supabaseAuth
     )
 }
 
+@OptIn(AuthUiExperimental::class)
 @Composable
 fun LoginScreen(
-    userState: UserState,
-    googleLogin: () -> Unit,
-    onLoginSuccess: () -> Unit
+    onLoginSuccess: () -> Unit,
+    supabaseAuth: ComposeAuth,
 ) {
-
     BroccolistTheme {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .safeDrawingPadding(),
         ) {
-            OutlinedButton(
-                shape = RoundedCornerShape(24.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                ),
-                onClick = {
-                    googleLogin()
-                    onLoginSuccess()
-                },
+            val googleSignIn = googleSignIn(supabaseAuth, onLoginSuccess)
+            val appleSignIn = appleSignIn(supabaseAuth, onLoginSuccess)
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(32.dp)
+                    .align(Alignment.TopCenter),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Icon(
-                    imageVector = Icons.Default.ShoppingCart,
-                    contentDescription = "Google Login Icon",
-                    tint = MaterialTheme.colorScheme.onPrimary
-                )
-                Spacer(Modifier.width(4.dp))
                 Text(
-                    text = "Login with Google",
-                    color = MaterialTheme.colorScheme.onPrimary
+                    text = "Welcome to Broccolist",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontSize = 28.sp,
+                    color = MaterialTheme.colorScheme.primary,
                 )
+                HorizontalDivider(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    thickness = 1.dp,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Icon(
+                    painter = painterResource(Res.drawable.broccolist_icon),
+                    contentDescription = "Broccolist icon",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(48.dp)
+                )
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    .align(Alignment.Center),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = "Please sign in with your provider",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontSize = 16.sp,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+                Spacer(Modifier.height(16.dp))
+                OutlinedButton(
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.background,
+                        contentColor = MaterialTheme.colorScheme.primary,
+                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+                    onClick = {
+                        googleSignIn.startFlow()
+                    },
+                ) {
+                    ProviderButtonContent(Google)
+                }
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.background,
+                        contentColor = MaterialTheme.colorScheme.primary,
+                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+                    onClick = {
+                        appleSignIn.startFlow()
+                    },
+                ) {
+                    ProviderButtonContent(Apple)
+                }
             }
         }
     }
+}
 
-    when (userState) {
-        UserState.NotAuthenticated -> {
-            // Show login screen
-        }
-        UserState.Authenticated -> {
-            // Show home screen
-        }
-        UserState.Loading -> {
-            // Show loading screen
+@Composable
+private fun googleSignIn(
+    supabaseAuth: ComposeAuth,
+    onLoginSuccess: () -> Unit
+): NativeSignInState {
+    val action = supabaseAuth.rememberSignInWithGoogle(
+        onResult = { result ->
+            when (result) {
+                is NativeSignInResult.Success -> {
+                    onLoginSuccess()
+                }
 
+                NativeSignInResult.ClosedByUser -> {
+                    println("User closed the login dialog")
+                }
+
+                is NativeSignInResult.Error -> {
+                    println("Error logging in: ${result.message}")
+                }
+
+                is NativeSignInResult.NetworkError -> {
+                    println("Network error logging in: ${result.message}")
+                }
+            }
         }
-        UserState.Error -> {
-            // Show error screen
+    )
+    return action
+}
+
+@Composable
+private fun appleSignIn( // TODO still need to setup apple oauth in supabase
+    supabaseAuth: ComposeAuth,
+    onLoginSuccess: () -> Unit
+): NativeSignInState {
+    val action = supabaseAuth.rememberSignInWithApple(
+        onResult = { result ->
+            when (result) {
+                is NativeSignInResult.Success -> {
+                    onLoginSuccess()
+                }
+
+                NativeSignInResult.ClosedByUser -> {
+                    println("User closed the login dialog")
+                }
+
+                is NativeSignInResult.Error -> {
+                    println("Error logging in: ${result.message}")
+                }
+
+                is NativeSignInResult.NetworkError -> {
+                    println("Network error logging in: ${result.message}")
+                }
+            }
         }
-    }
+    )
+    return action
 }

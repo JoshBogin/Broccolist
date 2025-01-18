@@ -66,6 +66,9 @@ kotlin {
             implementation(libs.postgrest.kt)
             implementation(libs.auth.kt)
             implementation(libs.realtime.kt)
+            implementation(libs.compose.auth)
+            implementation(libs.compose.auth.ui)
+
         }
 
         nativeMain.dependencies {
@@ -107,7 +110,6 @@ android {
 
 dependencies {
     implementation(libs.androidx.material3.android)
-    implementation(libs.androidx.media3.common.ktx)
     debugImplementation(compose.uiTooling)
 }
 

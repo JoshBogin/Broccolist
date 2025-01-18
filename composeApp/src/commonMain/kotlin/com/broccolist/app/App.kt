@@ -7,10 +7,6 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.lifecycle.ViewModel
-import androidx.navigation.NavBackStackEntry
-import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
@@ -18,7 +14,7 @@ import androidx.navigation.compose.rememberNavController
 import com.broccolist.checklist.presentation.CheckListScreenRoute
 import com.broccolist.checklist.presentation.CheckListViewModel
 import com.broccolist.login.presentation.LoginScreenRoute
-import com.broccolist.login.presentation.LoginViewModel
+import io.github.jan.supabase.compose.auth.composeAuth
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -28,6 +24,7 @@ fun App(
     viewModel: AppViewModel = koinViewModel()
 ) {
     val sessionStatus by viewModel.sessionStatus.collectAsState()
+    val supabaseClient = viewModel.supabaseClient
 
     BroccolistTheme(
         darkTheme = isSystemInDarkTheme()
@@ -52,6 +49,11 @@ fun App(
 
                         CheckListScreenRoute(
                             viewModel = checkListViewModel,
+                            onLogout = {
+                                navController.navigate(Route.Login) {
+                                    popUpTo(Route.CheckList) { inclusive = true }
+                                }
+                            }
                         )
                     }
                 }
@@ -60,11 +62,8 @@ fun App(
                     exitTransition = { slideOutHorizontally() },
                     popEnterTransition = { slideInHorizontally() }
                 ) {
-                    val loginViewModel = koinViewModel<LoginViewModel>()
-
-                    // TODO login screen should navigate back to list screen when authenticated
                     LoginScreenRoute(
-                        viewModel = loginViewModel,
+                        supabaseAuth = supabaseClient.composeAuth,
                         onLoginSuccess = {
                             navController.navigate(Route.CheckList) {
                                 popUpTo(Route.Login) { inclusive = true }
@@ -76,17 +75,4 @@ fun App(
         }
 
     }
-}
-
-@Composable
-private inline fun <reified T: ViewModel> NavBackStackEntry.sharedKoinViewModel(
-    navController: NavController
-): T {
-    val navGraphRoute = destination.parent?.route ?: return koinViewModel<T>()
-    val parentEntry = remember(this) {
-        navController.getBackStackEntry(navGraphRoute)
-    }
-    return koinViewModel(
-        viewModelStoreOwner = parentEntry
-    )
 }

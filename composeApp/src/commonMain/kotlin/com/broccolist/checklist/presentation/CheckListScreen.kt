@@ -34,6 +34,8 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.DrawerState
@@ -83,11 +85,14 @@ import kotlin.math.roundToInt
 @Composable
 fun CheckListScreenRoute(
     viewModel: CheckListViewModel = koinViewModel(),
+    onLogout: () -> Unit,
 ) {
     CheckListScreen(
         sections = viewModel.sections.collectAsStateWithLifecycle().value,
         addSection = viewModel::addSection,
         removeSection = viewModel::removeSection,
+        signOut = viewModel::signOut,
+        onLogout = onLogout
     )
 }
 
@@ -96,6 +101,8 @@ fun CheckListScreen(
     sections: List<Section>,
     addSection: (Section) -> Unit,
     removeSection: (Section) -> Unit,
+    signOut: suspend () -> Unit,
+    onLogout: () -> Unit,
 ) {
     val drawerState: DrawerState = rememberDrawerState(DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
@@ -115,52 +122,75 @@ fun CheckListScreen(
                     )
             ) {
                 Box(
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    Text(
-                        text = "Broccolist",
-                        fontSize = 24.sp,
-                        color = colorScheme.primary,
-                        modifier = Modifier
-                            .padding(16.dp)
-                            .align(Alignment.Center)
-                    )
-                }
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Start,
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(
-                                color = colorScheme.tertiary,
-                                shape = RoundedCornerShape(24.dp)
-                            )
+                            .align(Alignment.TopCenter),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        IconButton(
-                            onClick = { },
+                        Text(
+                            text = "Broccolist",
+                            fontSize = 24.sp,
+                            color = colorScheme.primary,
                             modifier = Modifier
-                                .padding(horizontal = 16.dp)
-                                .size(24.dp)
+                                .padding(16.dp)
+                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Start,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    color = colorScheme.tertiary,
+                                    shape = RoundedCornerShape(24.dp)
+                                )
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Home,
-                                contentDescription = "Home Icon",
-                                tint = colorScheme.primary,
-                                modifier = Modifier.fillMaxSize()
+                            IconButton(
+                                onClick = { },
+                                modifier = Modifier
+                                    .padding(horizontal = 16.dp)
+                                    .size(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Home,
+                                    contentDescription = "Home Icon",
+                                    tint = colorScheme.primary,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                            Text(
+                                text = "Home",
+                                fontSize = 20.sp,
+                                color = colorScheme.primary,
+                                modifier = Modifier.padding(16.dp)
                             )
                         }
+                    }
+                    Button(
+                        onClick = {
+                            coroutineScope.launch {
+                                signOut()
+                                onLogout()
+                            }
+                        },
+                        shape = RoundedCornerShape(24.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = colorScheme.primary
+                        ),
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .align(Alignment.BottomCenter)
+                    ) {
                         Text(
-                            text = "Home",
-                            fontSize = 20.sp,
-                            color = colorScheme.primary,
-                            modifier = Modifier.padding(16.dp)
+                            text = "Sign Out",
+                            fontSize = 16.sp,
+                            color = colorScheme.onPrimary
                         )
                     }
                 }
+
             }
         },
         drawerState = drawerState,
@@ -601,7 +631,9 @@ fun CheckListScreenPreview() {
                 ),
             ),
             addSection = { },
-            removeSection = { }
+            removeSection = { },
+            signOut = { },
+            onLogout = { },
         )
     }
 }
@@ -650,7 +682,9 @@ fun CheckListScreenDarkPreview() {
                 ),
             ),
             addSection = { },
-            removeSection = { }
+            removeSection = { },
+            signOut = { },
+            onLogout = { },
         )
     }
 }
