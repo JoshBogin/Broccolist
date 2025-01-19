@@ -21,15 +21,17 @@ class CheckListViewModel(
 
     fun removeSection(section: Section) {
         val currentSections = _sections.value.toMutableList()
-
-        for (sec in _sections.value) {
-            if (sec.name == section.name) {
-                currentSections.remove(sec)
-                break
-            }
-        }
-
+        currentSections.remove(section)
         _sections.value = currentSections
+    }
+
+    fun updateSection(section: Section) {
+        val currentSections = _sections.value.toMutableList()
+        val index = currentSections.indexOfFirst { it.id == section.id }
+        if (index != -1) {
+            currentSections[index] = section
+            _sections.value = currentSections
+        }
     }
 
     suspend fun signOut() {

@@ -109,6 +109,7 @@ fun CheckListScreenRoute(
         sections = viewModel.sections.collectAsStateWithLifecycle().value,
         addSection = viewModel::addSection,
         removeSection = viewModel::removeSection,
+        updateSection = viewModel::updateSection,
         signOut = viewModel::signOut,
         onLogout = onLogout
     )
@@ -119,6 +120,7 @@ fun CheckListScreen(
     sections: List<Section>,
     addSection: (Section) -> Unit,
     removeSection: (Section) -> Unit,
+    updateSection: (Section) -> Unit,
     signOut: suspend () -> Unit,
     onLogout: () -> Unit,
 ) {
@@ -295,7 +297,7 @@ fun CheckListScreen(
                                                     isChecked = false
                                                 )
                                             ),
-                                            id = "id"
+                                            id = (0..1000000).random().toString()
                                         )
                                     )
                                     showItems = false
@@ -325,7 +327,7 @@ fun CheckListScreen(
                                 onClick = {
                                     addSection(
                                         Section(
-                                            id = "id",
+                                            id =  (0..1000000).random().toString(),
                                             name = "New Section",
                                             items = listOf(
                                                 SectionItem(
@@ -392,7 +394,8 @@ fun CheckListScreen(
                 items(sections) { section ->
                     ItemSection(
                         removeSection = removeSection,
-                        itemSection = section,
+                        onSectionUpdate = updateSection,
+                        section = section,
                         onSwipe = {
                             swipeInCooldown = true
                             coroutineScope.launch {
@@ -411,11 +414,11 @@ fun CheckListScreen(
 @Composable
 private fun ItemSection(
     removeSection: (Section) -> Unit,
-    itemSection: Section,
+    onSectionUpdate: (Section) -> Unit,
+    section: Section,
     onSwipe: () -> Unit = {},
     swipeInCooldown: Boolean = false,
 ) {
-    var section by remember { mutableStateOf(itemSection) }
     var showItems by remember { mutableStateOf(false) }
     val colorScheme = MaterialTheme.colorScheme
 
@@ -430,7 +433,7 @@ private fun ItemSection(
             showItems = showItems,
             onClick = { showItems = !showItems },
             section = section,
-            onSectionUpdate = { section = it },
+            onSectionUpdate = { onSectionUpdate(it) },
             onDeleteSwipe = onSwipe,
             swipeInCooldown = swipeInCooldown,
         )
@@ -666,10 +669,10 @@ private fun SwipeableBox2(
                             }
 
                             // Haptic feedback
-                            if (offsetX < showOptionsThreshold * 0.8f && !hasTriggeredHaptic) {
+                            if (offsetX < fullDeleteThresholdPx * 0.8f && !hasTriggeredHaptic) {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 hasTriggeredHaptic = true
-                            } else if (offsetX > showOptionsThreshold * 0.8f) {
+                            } else if (offsetX > fullDeleteThresholdPx * 0.8f) {
                                 hasTriggeredHaptic = false
                             }
                         },
@@ -678,6 +681,8 @@ private fun SwipeableBox2(
                             if (offsetX < showOptionsStartThreshold && offsetX > fullDeleteThresholdPx) {
                                 offsetX = showOptionsThreshold
                             } else if (offsetX >= showOptionsStartThreshold) {
+                                offsetX = 0f
+                            } else if (offsetX < fullDeleteThresholdPx) {
                                 offsetX = 0f
                             }
                         }
@@ -832,6 +837,7 @@ fun CheckListScreenPreview() {
             ),
             addSection = { },
             removeSection = { },
+            updateSection = { },
             signOut = { },
             onLogout = { },
         )
@@ -883,6 +889,7 @@ fun CheckListScreenDarkPreview() {
             ),
             addSection = { },
             removeSection = { },
+            updateSection = { },
             signOut = { },
             onLogout = { },
         )
