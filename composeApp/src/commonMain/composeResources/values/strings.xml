@@ -7,4 +7,18 @@
     <string name="cd_broccolist_icon">Broccolist Icon</string>
     <string name="login_error">An error occurred</string>
 
+    <!-- CheckList Screen -->
+    <string name="sign_out">Sign Out</string>
+    <string name="home">Home</string>
+    <string name="cd_home_icon">Home Icon</string>
+    <string name="cd_drawer_menu">Drawer Menu</string>
+    <string name="cd_add_section">Add Section</string>
+    <string name="section">Section</string>
+    <string name="cd_add_item">Add Item</string>
+    <string name="item">Item</string>
+    <string name="add_close_icon">Add/Close Icon</string>
+    <string name="cd_delete_icon">Delete</string>
+    <string name="cd_chevron_icon">Chevron Icon</string>
+    <string name="cd_edit_icon">Edit Icon</string>
+
 </resources>

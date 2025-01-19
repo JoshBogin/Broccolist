@@ -18,6 +18,8 @@ object BroccolistTheme {
         onBackground = BroccolistColors.Black,
         onSurface = BroccolistColors.Black,
         surfaceContainer = BroccolistColors.ModalSheetLightGray,
+        tertiaryContainer = BroccolistColors.EditGray,
+        onTertiaryContainer = BroccolistColors.Black,
     )
 
     // You can also define dark colors if you want to support dark mode
@@ -34,6 +36,8 @@ object BroccolistTheme {
         onBackground = BroccolistColors.White,
         onSurface = BroccolistColors.White,
         surfaceContainer = BroccolistColors.ModalSheetDarkGray,
+        tertiaryContainer = BroccolistColors.EditGrayDark,
+        onTertiaryContainer = BroccolistColors.White,
     )
 
     @Composable

@@ -30,10 +30,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
@@ -49,8 +51,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -72,12 +76,26 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import broccolist.composeapp.generated.resources.Res
+import broccolist.composeapp.generated.resources.add_close_icon
+import broccolist.composeapp.generated.resources.app_name
 import broccolist.composeapp.generated.resources.broccolist_icon
+import broccolist.composeapp.generated.resources.cd_add_item
+import broccolist.composeapp.generated.resources.cd_add_section
+import broccolist.composeapp.generated.resources.cd_chevron_icon
+import broccolist.composeapp.generated.resources.cd_delete_icon
+import broccolist.composeapp.generated.resources.cd_drawer_menu
+import broccolist.composeapp.generated.resources.cd_edit_icon
+import broccolist.composeapp.generated.resources.cd_home_icon
+import broccolist.composeapp.generated.resources.home
+import broccolist.composeapp.generated.resources.item
+import broccolist.composeapp.generated.resources.section
+import broccolist.composeapp.generated.resources.sign_out
 import com.broccolist.checklist.domain.Section
 import com.broccolist.checklist.domain.SectionItem
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.math.roundToInt
@@ -131,7 +149,7 @@ fun CheckListScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = "Broccolist",
+                            text = stringResource(Res.string.app_name),
                             fontSize = 24.sp,
                             color = colorScheme.primary,
                             modifier = Modifier
@@ -155,13 +173,13 @@ fun CheckListScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Home,
-                                    contentDescription = "Home Icon",
+                                    contentDescription = stringResource(Res.string.cd_home_icon),
                                     tint = colorScheme.primary,
                                     modifier = Modifier.fillMaxSize()
                                 )
                             }
                             Text(
-                                text = "Home",
+                                text = stringResource(Res.string.home),
                                 fontSize = 20.sp,
                                 color = colorScheme.primary,
                                 modifier = Modifier.padding(16.dp)
@@ -184,7 +202,7 @@ fun CheckListScreen(
                             .align(Alignment.BottomCenter)
                     ) {
                         Text(
-                            text = "Sign Out",
+                            text = stringResource(Res.string.sign_out),
                             fontSize = 16.sp,
                             color = colorScheme.onPrimary
                         )
@@ -217,7 +235,7 @@ fun CheckListScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Menu,
-                            contentDescription = "Drawer Menu",
+                            contentDescription = stringResource(Res.string.cd_drawer_menu),
                             tint = colorScheme.primary,
                             modifier = Modifier.fillMaxSize()
                         )
@@ -291,14 +309,14 @@ fun CheckListScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.ShoppingCart,
-                                    contentDescription = "Add Section",
+                                    contentDescription = stringResource(Res.string.cd_add_section),
                                     tint = colorScheme.primary,
                                     modifier = Modifier
                                         .size(24.dp)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "Section",
+                                    text = stringResource(Res.string.section),
                                     fontSize = 16.sp,
                                     color = colorScheme.primary,
                                 )
@@ -328,14 +346,14 @@ fun CheckListScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.ShoppingCart,
-                                    contentDescription = "Add Item",
+                                    contentDescription = stringResource(Res.string.cd_add_item),
                                     tint = colorScheme.primary,
                                     modifier = Modifier
                                         .size(24.dp)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "Item",
+                                    text = stringResource(Res.string.item),
                                     fontSize = 16.sp,
                                     color = colorScheme.primary,
                                 )
@@ -353,7 +371,7 @@ fun CheckListScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Add,
-                            contentDescription = "Add/Close Icon",
+                            contentDescription = stringResource(Res.string.add_close_icon),
                             tint = colorScheme.primary,
                             modifier = Modifier
                                 .size(32.dp)
@@ -374,8 +392,7 @@ fun CheckListScreen(
                 items(sections) { section ->
                     ItemSection(
                         removeSection = removeSection,
-                        section = section.name,
-                        items = section.items,
+                        itemSection = section,
                         onSwipe = {
                             swipeInCooldown = true
                             coroutineScope.launch {
@@ -394,11 +411,11 @@ fun CheckListScreen(
 @Composable
 private fun ItemSection(
     removeSection: (Section) -> Unit,
-    section: String,
-    items: List<SectionItem>?,
+    itemSection: Section,
     onSwipe: () -> Unit = {},
     swipeInCooldown: Boolean = false,
 ) {
+    var section by remember { mutableStateOf(itemSection) }
     var showItems by remember { mutableStateOf(false) }
     val colorScheme = MaterialTheme.colorScheme
 
@@ -407,13 +424,14 @@ private fun ItemSection(
             .fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        SwipeableBox(
+        SwipeableBox2(
             removeSection = removeSection,
             colorScheme = colorScheme,
             showItems = showItems,
             onClick = { showItems = !showItems },
             section = section,
-            onSwipe = onSwipe,
+            onSectionUpdate = { section = it },
+            onDeleteSwipe = onSwipe,
             swipeInCooldown = swipeInCooldown,
         )
 
@@ -427,7 +445,7 @@ private fun ItemSection(
                 modifier = Modifier
                     .fillMaxWidth()
             ) {
-                items?.forEachIndexed { index, item ->
+                section.items?.forEachIndexed { index, item ->
                     val color = if (index % 2 == 1) {
                         colorScheme.secondaryContainer
                     } else {
@@ -449,8 +467,9 @@ private fun SwipeableBox(
     colorScheme: ColorScheme,
     showItems: Boolean,
     onClick: () -> Unit,
-    section: String,
-    onSwipe: () -> Unit = {},
+    section: Section,
+    onSectionUpdate: (Section) -> Unit,
+    onDeleteSwipe: () -> Unit = {},
     swipeInCooldown: Boolean = false,
 ) {
     val density = LocalDensity.current
@@ -473,7 +492,7 @@ private fun SwipeableBox(
         ) {
             Icon(
                 imageVector = Icons.Default.Delete,
-                contentDescription = "Delete",
+                contentDescription = stringResource(Res.string.cd_delete_icon),
                 tint = colorScheme.onError
             )
         }
@@ -495,17 +514,8 @@ private fun SwipeableBox(
                         }
                         offsetX += delta
                         if (offsetX < thresholdPx) {
-                            removeSection(Section(
-                                id = "id",
-                                name = section,
-                                items = listOf(
-                                        SectionItem(
-                                            name = "New Item",
-                                            isChecked = false
-                                        )
-                                )
-                            ))
-                            onSwipe()
+                            removeSection(section)
+                            onDeleteSwipe()
                             offsetX = 0f
                         }
 
@@ -523,7 +533,7 @@ private fun SwipeableBox(
                 ),
         ) {
             Text(
-                text = section,
+                text = section.name,
                 fontSize = 16.sp,
                 color = colorScheme.primary,
                 modifier = Modifier
@@ -531,7 +541,7 @@ private fun SwipeableBox(
                     .align(Alignment.Center)
             )
             IconButton(
-                onClick =  onClick,
+                onClick = onClick,
                 modifier = Modifier
                     .padding(horizontal = 16.dp)
                     .padding(vertical = 8.dp)
@@ -540,7 +550,7 @@ private fun SwipeableBox(
             ) {
                 Icon(
                     imageVector = Icons.Default.KeyboardArrowDown,
-                    contentDescription = "Chevron Icon",
+                    contentDescription = stringResource(Res.string.cd_chevron_icon),
                     tint = colorScheme.primary,
                     modifier = Modifier
                         .fillMaxSize()
@@ -550,6 +560,196 @@ private fun SwipeableBox(
         }
     }
 }
+
+@Composable
+private fun SwipeableBox2(
+    removeSection: (Section) -> Unit,
+    colorScheme: ColorScheme,
+    showItems: Boolean,
+    onClick: () -> Unit,
+    section: Section,
+    onSectionUpdate: (Section) -> Unit,
+    onDeleteSwipe: () -> Unit = {},
+    swipeInCooldown: Boolean = false,
+) {
+    val density = LocalDensity.current
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    val showOptionsStartThreshold = with(density) { -80.dp.toPx() }
+    val showOptionsThreshold = with(density) { -180.dp.toPx() }
+    val deleteThresholdPx = with(density) { -240.dp.toPx() }
+    val fullDeleteThresholdPx = with(density) { -300.dp.toPx() }
+
+    var showEditDialog by remember { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
+    var hasTriggeredHaptic by remember { mutableStateOf(false) }
+    val showEditOption = offsetX > deleteThresholdPx
+
+    Box {
+        // Background layer
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min)
+        ) {
+            // Split background for edit and delete
+            Row(
+                horizontalArrangement = Arrangement.End,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                // Edit background
+                AnimatedVisibility(showEditOption) {
+                    Box(
+                        modifier = Modifier
+                            .height(IntrinsicSize.Min)
+                            .background(colorScheme.tertiaryContainer)
+                            .clickable { showEditDialog = true }
+                            .padding(horizontal = 32.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = stringResource(Res.string.cd_edit_icon),
+                            tint = colorScheme.onTertiaryContainer
+                        )
+                    }
+                }
+
+                val deleteWidth = if (showEditOption)
+                    Modifier.width(IntrinsicSize.Min)
+                else
+                    Modifier.fillMaxWidth()
+
+                // Delete background
+                Box(
+                    modifier = Modifier
+                        .height(IntrinsicSize.Min)
+                        .then(deleteWidth)
+                        .background(colorScheme.error)
+                        .clickable {
+                            removeSection(section)
+                            onDeleteSwipe()
+                        }
+                        .padding(horizontal = 32.dp, vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = stringResource(Res.string.cd_delete_icon),
+                        tint = colorScheme.onError
+                    )
+                }
+            }
+
+            // Foreground content
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .offset { IntOffset(offsetX.roundToInt(), 0) }
+                    .background(colorScheme.background)
+                    .clickable(
+                        interactionSource = null,
+                        indication = null
+                    ) { onClick() }
+                    .draggable(
+                        orientation = Orientation.Horizontal,
+                        state = rememberDraggableState { delta ->
+                            if (swipeInCooldown || delta > 0 && offsetX >= 0f) {
+                                return@rememberDraggableState
+                            }
+                            offsetX += delta
+
+                            // Trigger delete if swiped past fullDeleteThreshold
+                            if (offsetX < fullDeleteThresholdPx) {
+                                removeSection(section)
+                                onDeleteSwipe()
+                                offsetX = 0f
+                            }
+
+                            // Haptic feedback
+                            if (offsetX < showOptionsThreshold * 0.8f && !hasTriggeredHaptic) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                hasTriggeredHaptic = true
+                            } else if (offsetX > showOptionsThreshold * 0.8f) {
+                                hasTriggeredHaptic = false
+                            }
+                        },
+                        onDragStopped = {
+                            // Snap to edit/delete position or reset
+                            if (offsetX < showOptionsStartThreshold && offsetX > fullDeleteThresholdPx) {
+                                offsetX = showOptionsThreshold
+                            } else if (offsetX >= showOptionsStartThreshold) {
+                                offsetX = 0f
+                            }
+                        }
+                    ),
+            ) {
+                Text(
+                    text = section.name,
+                    fontSize = 16.sp,
+                    color = colorScheme.primary,
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .align(Alignment.Center)
+                )
+                IconButton(
+                    onClick = onClick,
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp)
+                        .padding(vertical = 8.dp)
+                        .size(16.dp)
+                        .align(Alignment.CenterEnd)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = stringResource(Res.string.cd_chevron_icon),
+                        tint = colorScheme.primary,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .rotate(if (showItems) 180f else 0f)
+                    )
+                }
+            }
+        }
+
+        // Edit Dialog
+        if (showEditDialog) {
+            var newName by remember { mutableStateOf(section.name) }
+
+            AlertDialog(
+                onDismissRequest = { showEditDialog = false },
+                title = { Text("Edit Section Name") },
+                text = {
+                    OutlinedTextField(
+                        value = newName,
+                        onValueChange = { newName = it },
+                        label = { Text("Section Name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            onSectionUpdate(section.copy(name = newName))
+                            showEditDialog = false
+                            offsetX = 0f
+                        }
+                    ) {
+                        Text("Save")
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { showEditDialog = false }
+                    ) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+    }
+}
+
 
 @Composable
 private fun ItemRow(
