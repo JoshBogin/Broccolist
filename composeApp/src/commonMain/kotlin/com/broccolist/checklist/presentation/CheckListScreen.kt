@@ -90,6 +90,7 @@ import broccolist.composeapp.generated.resources.home
 import broccolist.composeapp.generated.resources.item
 import broccolist.composeapp.generated.resources.section
 import broccolist.composeapp.generated.resources.sign_out
+import com.broccolist.checklist.domain.GrocerySection
 import com.broccolist.checklist.domain.Section
 import com.broccolist.checklist.domain.SectionItem
 import kotlinx.coroutines.delay
@@ -127,6 +128,7 @@ fun CheckListScreen(
     val drawerState: DrawerState = rememberDrawerState(DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
     var swipeInCooldown by remember { mutableStateOf(false) }
+    var showSectionSelector by remember { mutableStateOf(false) }
     val colorScheme = MaterialTheme.colorScheme
 
     ModalNavigationDrawer(
@@ -287,21 +289,7 @@ fun CheckListScreen(
                             horizontalAlignment = Alignment.End,
                         ) {
                             ExtendedFloatingActionButton(
-                                onClick = {
-                                    addSection(
-                                        Section(
-                                            name = "New Section",
-                                            items = listOf(
-                                                SectionItem(
-                                                    name = "New Item",
-                                                    isChecked = false
-                                                )
-                                            ),
-                                            id = (0..1000000).random().toString()
-                                        )
-                                    )
-                                    showItems = false
-                                },
+                                onClick = { showSectionSelector = true },
                                 containerColor = colorScheme.background,
                                 elevation = FloatingActionButtonDefaults.elevation(
                                     defaultElevation = 4.dp,
@@ -328,7 +316,7 @@ fun CheckListScreen(
                                     addSection(
                                         Section(
                                             id =  (0..1000000).random().toString(),
-                                            name = "New Section",
+                                            section = GrocerySection.Custom("New Section"),
                                             items = listOf(
                                                 SectionItem(
                                                     name = "New Item",
@@ -407,6 +395,50 @@ fun CheckListScreen(
                     )
                 }
             }
+
+            if (showSectionSelector) {
+                var selectedSection by remember {
+                    mutableStateOf<GrocerySection>(GrocerySection.Custom(""))
+                }
+
+                AlertDialog(
+                    onDismissRequest = { showSectionSelector = false },
+                    title = { Text("Add Section") },
+                    text = {
+                        SectionSelector(
+                            onSectionSelected = { newSection ->
+                                selectedSection = newSection
+                            }
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                if (selectedSection == GrocerySection.Custom("")) {
+                                    return@TextButton
+                                }
+                                addSection(
+                                    Section(
+                                        section = selectedSection,
+                                        items = emptyList(),
+                                        id = (0..1000000).random().toString()
+                                    )
+                                )
+                                showSectionSelector = false
+                            }
+                        ) {
+                            Text("Add")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = { showSectionSelector = false }
+                        ) {
+                            Text("Cancel")
+                        }
+                    }
+                )
+            }
         }
     }
 }
@@ -427,7 +459,7 @@ private fun ItemSection(
             .fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        SwipeableBox2(
+        SwipeableBox(
             removeSection = removeSection,
             colorScheme = colorScheme,
             showItems = showItems,
@@ -477,115 +509,15 @@ private fun SwipeableBox(
 ) {
     val density = LocalDensity.current
     var offsetX by remember { mutableFloatStateOf(0f) }
-    val thresholdPx = with(density) { -200.dp.toPx() }
-
-    val haptic = LocalHapticFeedback.current
-    var hasTriggeredHaptic by remember { mutableStateOf(false) }
-
-    Box {
-        // Delete background (appears when swiping)
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(IntrinsicSize.Min)
-                .background(colorScheme.error)
-                .padding(horizontal = 16.dp)
-                .padding(vertical = 8.dp),
-            contentAlignment = Alignment.CenterEnd
-        ) {
-            Icon(
-                imageVector = Icons.Default.Delete,
-                contentDescription = stringResource(Res.string.cd_delete_icon),
-                tint = colorScheme.onError
-            )
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .offset { IntOffset(offsetX.roundToInt(), 0) }
-                .background(colorScheme.background)
-                .clickable(
-                    interactionSource = null,
-                    indication = null
-                ) { onClick() }
-                .draggable(
-                    orientation = Orientation.Horizontal,
-                    state = rememberDraggableState { delta ->
-                        if (swipeInCooldown || delta > 0 && offsetX >= 0f) {
-                            return@rememberDraggableState
-                        }
-                        offsetX += delta
-                        if (offsetX < thresholdPx) {
-                            removeSection(section)
-                            onDeleteSwipe()
-                            offsetX = 0f
-                        }
-
-                        // add haptic feedback
-                        if (offsetX < thresholdPx * 0.8f && !hasTriggeredHaptic) {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            hasTriggeredHaptic = true
-                        } else if (offsetX > thresholdPx * 0.8f) {
-                            hasTriggeredHaptic = false
-                        }
-                    },
-                    onDragStopped = {
-                        offsetX = 0f
-                    }
-                ),
-        ) {
-            Text(
-                text = section.name,
-                fontSize = 16.sp,
-                color = colorScheme.primary,
-                modifier = Modifier
-                    .padding(8.dp)
-                    .align(Alignment.Center)
-            )
-            IconButton(
-                onClick = onClick,
-                modifier = Modifier
-                    .padding(horizontal = 16.dp)
-                    .padding(vertical = 8.dp)
-                    .size(16.dp)
-                    .align(Alignment.CenterEnd)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.KeyboardArrowDown,
-                    contentDescription = stringResource(Res.string.cd_chevron_icon),
-                    tint = colorScheme.primary,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .rotate(if (showItems) 180f else 0f)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SwipeableBox2(
-    removeSection: (Section) -> Unit,
-    colorScheme: ColorScheme,
-    showItems: Boolean,
-    onClick: () -> Unit,
-    section: Section,
-    onSectionUpdate: (Section) -> Unit,
-    onDeleteSwipe: () -> Unit = {},
-    swipeInCooldown: Boolean = false,
-) {
-    val density = LocalDensity.current
-    var offsetX by remember { mutableFloatStateOf(0f) }
     val showOptionsStartThreshold = with(density) { -80.dp.toPx() }
     val showOptionsThreshold = with(density) { -180.dp.toPx() }
-    val deleteThresholdPx = with(density) { -240.dp.toPx() }
-    val fullDeleteThresholdPx = with(density) { -300.dp.toPx() }
+    val deleteThreshold = with(density) { -240.dp.toPx() }
+    val fullDeleteThreshold = with(density) { -300.dp.toPx() }
 
     var showEditDialog by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
     var hasTriggeredHaptic by remember { mutableStateOf(false) }
-    val showEditOption = offsetX > deleteThresholdPx
+    val showEditOption = offsetX > deleteThreshold
 
     Box {
         // Background layer
@@ -662,34 +594,37 @@ private fun SwipeableBox2(
                             offsetX += delta
 
                             // Trigger delete if swiped past fullDeleteThreshold
-                            if (offsetX < fullDeleteThresholdPx) {
+                            if (offsetX < fullDeleteThreshold) {
                                 removeSection(section)
                                 onDeleteSwipe()
                                 offsetX = 0f
                             }
 
                             // Haptic feedback
-                            if (offsetX < fullDeleteThresholdPx * 0.8f && !hasTriggeredHaptic) {
+                            if (offsetX < fullDeleteThreshold * 0.8f && !hasTriggeredHaptic) {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 hasTriggeredHaptic = true
-                            } else if (offsetX > fullDeleteThresholdPx * 0.8f) {
+                            } else if (offsetX > fullDeleteThreshold * 0.8f) {
                                 hasTriggeredHaptic = false
                             }
                         },
                         onDragStopped = {
-                            // Snap to edit/delete position or reset
-                            if (offsetX < showOptionsStartThreshold && offsetX > fullDeleteThresholdPx) {
-                                offsetX = showOptionsThreshold
-                            } else if (offsetX >= showOptionsStartThreshold) {
+                            // Delete row if swiped past deleteThreshold
+                            if (offsetX <= deleteThreshold) {
+                                removeSection(section)
+                                onDeleteSwipe()
                                 offsetX = 0f
-                            } else if (offsetX < fullDeleteThresholdPx) {
+                            // Otherwise, snap to edit/delete position or reset
+                            } else if (offsetX <= showOptionsStartThreshold && offsetX > deleteThreshold) {
+                                offsetX = showOptionsThreshold
+                            } else if (offsetX > showOptionsStartThreshold) {
                                 offsetX = 0f
                             }
                         }
                     ),
             ) {
                 Text(
-                    text = section.name,
+                    text = section.section.displayName,
                     fontSize = 16.sp,
                     color = colorScheme.primary,
                     modifier = Modifier
@@ -718,7 +653,7 @@ private fun SwipeableBox2(
 
         // Edit Dialog
         if (showEditDialog) {
-            var newName by remember { mutableStateOf(section.name) }
+            var newName by remember { mutableStateOf(section.section.displayName) }
 
             AlertDialog(
                 onDismissRequest = { showEditDialog = false },
@@ -735,7 +670,7 @@ private fun SwipeableBox2(
                 confirmButton = {
                     TextButton(
                         onClick = {
-                            onSectionUpdate(section.copy(name = newName))
+                            onSectionUpdate(section.copy(section = GrocerySection.Custom(newName)))
                             showEditDialog = false
                             offsetX = 0f
                         }
@@ -800,7 +735,7 @@ fun CheckListScreenPreview() {
             sections = listOf(
                 Section(
                     id = "id",
-                    name = "Section 1",
+                    section = GrocerySection.Custom("Section 1"),
                     items = listOf(
                         SectionItem(
                             name = "Item 1",
@@ -818,7 +753,7 @@ fun CheckListScreenPreview() {
                 ),
                 Section(
                     id = "id",
-                    name = "Section 2",
+                    section = GrocerySection.Custom("Section 2"),
                     items = listOf(
                         SectionItem(
                             name = "Item 1",
@@ -852,7 +787,7 @@ fun CheckListScreenDarkPreview() {
             sections = listOf(
                 Section(
                     id = "id",
-                    name = "Section 1",
+                    section = GrocerySection.Custom("Section 1"),
                     items = listOf(
                         SectionItem(
                             name = "Item 1",
@@ -870,7 +805,7 @@ fun CheckListScreenDarkPreview() {
                 ),
                 Section(
                     id = "id",
-                    name = "Section 2",
+                    section = GrocerySection.Custom("Section 2"),
                     items = listOf(
                         SectionItem(
                             name = "Item 1",
