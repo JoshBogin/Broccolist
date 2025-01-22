@@ -1,5 +1,6 @@
-package com.broccolist.checklist.presentation
+package com.broccolist.checklist.presentation.Components
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -14,6 +15,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.broccolist.checklist.domain.GrocerySection
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
@@ -27,7 +29,9 @@ fun SectionSelector(
     var customSectionName by remember { mutableStateOf("") }
     var selectedSection by remember { mutableStateOf("Select a section") }
 
-    Column {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
         // Dropdown for predefined sections
         ExposedDropdownMenuBox(
             expanded = expandedDropdown,

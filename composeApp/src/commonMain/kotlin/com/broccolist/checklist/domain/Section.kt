@@ -7,6 +7,7 @@ data class Section(
 )
 
 data class SectionItem(
+    val id: String,
     val name: String,
     val isChecked: Boolean
 )

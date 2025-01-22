@@ -2,6 +2,7 @@ package com.broccolist.checklist.presentation
 
 import com.broccolist.app.MPViewModel
 import com.broccolist.checklist.domain.Section
+import com.broccolist.checklist.domain.SectionItem
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,6 +31,33 @@ class CheckListViewModel(
         val index = currentSections.indexOfFirst { it.id == section.id }
         if (index != -1) {
             currentSections[index] = section
+            _sections.value = currentSections
+        }
+    }
+
+    // This function is used to add an item to a section. If the section does not exist, it will be created.
+    fun addItemToSection(section: Section, item: SectionItem) {
+        val currentSections = _sections.value.toMutableList()
+        val index = currentSections.indexOfFirst { it.id == section.id }
+        if (index != -1) {
+            val currentItems = currentSections[index].items?.toMutableList() ?: mutableListOf()
+            currentItems.add(item)
+            currentSections[index] = currentSections[index].copy(items = currentItems)
+            _sections.value = currentSections
+        } else {
+            val newSection = section.copy(items = listOf(item))
+            currentSections.add(newSection)
+            _sections.value = currentSections
+        }
+    }
+
+    fun removeItemFromSection(section: Section, item: SectionItem) {
+        val currentSections = _sections.value.toMutableList()
+        val index = currentSections.indexOfFirst { it.id == section.id }
+        if (index != -1) {
+            val currentItems = currentSections[index].items?.toMutableList() ?: mutableListOf()
+            currentItems.remove(item)
+            currentSections[index] = currentSections[index].copy(items = currentItems)
             _sections.value = currentSections
         }
     }

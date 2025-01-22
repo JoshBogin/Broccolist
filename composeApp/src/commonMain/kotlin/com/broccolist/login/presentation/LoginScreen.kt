@@ -1,7 +1,7 @@
 package com.broccolist.login.presentation
 
-import BroccolistTheme.BroccolistTheme
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -57,84 +57,83 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit,
     supabaseAuth: ComposeAuth,
 ) {
-    BroccolistTheme {
-        Box(
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+    ) {
+        val googleSignIn = googleSignIn(supabaseAuth, onLoginSuccess)
+        val appleSignIn = appleSignIn(supabaseAuth, onLoginSuccess)
+
+        Column(
             modifier = Modifier
-                .fillMaxSize()
-                .safeDrawingPadding(),
+                .fillMaxWidth()
+                .safeDrawingPadding()
+                .padding(24.dp)
+                .align(Alignment.TopCenter),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            val googleSignIn = googleSignIn(supabaseAuth, onLoginSuccess)
-            val appleSignIn = appleSignIn(supabaseAuth, onLoginSuccess)
-
-            Column(
+            Text(
+                text = stringResource(Res.string.login_title),
+                style = MaterialTheme.typography.titleLarge,
+                fontSize = 28.sp,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            HorizontalDivider(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(32.dp)
-                    .align(Alignment.TopCenter),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
+                    .padding(16.dp),
+                thickness = 1.dp,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Icon(
+                painter = painterResource(Res.drawable.broccolist_icon),
+                contentDescription = stringResource(Res.string.cd_broccolist_icon),
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(48.dp)
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .align(Alignment.Center),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = stringResource(Res.string.login_subtitle),
+                style = MaterialTheme.typography.titleSmall,
+                fontSize = 16.sp,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            Spacer(Modifier.height(16.dp))
+            OutlinedButton(
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+                onClick = {
+                    googleSignIn.startFlow()
+                },
             ) {
-                Text(
-                    text = stringResource(Res.string.login_title),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontSize = 28.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                HorizontalDivider(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    thickness = 1.dp,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Icon(
-                    painter = painterResource(Res.drawable.broccolist_icon),
-                    contentDescription = stringResource(Res.string.cd_broccolist_icon),
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(48.dp)
-                )
+                ProviderButtonContent(Google)
             }
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-                    .align(Alignment.Center),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+                onClick = {
+                    appleSignIn.startFlow()
+                },
             ) {
-                Text(
-                    text = stringResource(Res.string.login_subtitle),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontSize = 16.sp,
-                    color = MaterialTheme.colorScheme.onBackground,
-                )
-                Spacer(Modifier.height(16.dp))
-                OutlinedButton(
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.background,
-                        contentColor = MaterialTheme.colorScheme.primary,
-                    ),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
-                    onClick = {
-                        googleSignIn.startFlow()
-                    },
-                ) {
-                    ProviderButtonContent(Google)
-                }
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.background,
-                        contentColor = MaterialTheme.colorScheme.primary,
-                    ),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
-                    onClick = {
-                        appleSignIn.startFlow()
-                    },
-                ) {
-                    ProviderButtonContent(Apple)
-                }
+                ProviderButtonContent(Apple)
             }
         }
     }
@@ -171,7 +170,7 @@ private fun googleSignIn(
 
 @Composable
 private fun appleSignIn( // TODO still need to setup apple oauth in supabase,
-                         //   but this is blocked by apple dev account
+    //   but this is blocked by apple dev account
     supabaseAuth: ComposeAuth,
     onLoginSuccess: () -> Unit
 ): NativeSignInState {

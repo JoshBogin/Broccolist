@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -34,7 +36,6 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -57,6 +58,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -93,6 +95,9 @@ import broccolist.composeapp.generated.resources.sign_out
 import com.broccolist.checklist.domain.GrocerySection
 import com.broccolist.checklist.domain.Section
 import com.broccolist.checklist.domain.SectionItem
+import com.broccolist.checklist.presentation.Components.ItemInserter
+import com.broccolist.checklist.presentation.Components.PlaceholderItemRow
+import com.broccolist.checklist.presentation.Components.SectionSelector
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
@@ -111,6 +116,8 @@ fun CheckListScreenRoute(
         addSection = viewModel::addSection,
         removeSection = viewModel::removeSection,
         updateSection = viewModel::updateSection,
+        addItemToSection = viewModel::addItemToSection,
+        removeItemFromSection = viewModel::removeItemFromSection,
         signOut = viewModel::signOut,
         onLogout = onLogout
     )
@@ -122,13 +129,17 @@ fun CheckListScreen(
     addSection: (Section) -> Unit,
     removeSection: (Section) -> Unit,
     updateSection: (Section) -> Unit,
+    addItemToSection: (Section, SectionItem) -> Unit,
+    removeItemFromSection: (Section, SectionItem) -> Unit,
     signOut: suspend () -> Unit,
     onLogout: () -> Unit,
 ) {
     val drawerState: DrawerState = rememberDrawerState(DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
     var swipeInCooldown by remember { mutableStateOf(false) }
+    var currentlySwipedId by remember { mutableStateOf<String?>(null) }
     var showSectionSelector by remember { mutableStateOf(false) }
+    var showItemInserter by remember { mutableStateOf(false) }
     val colorScheme = MaterialTheme.colorScheme
 
     ModalNavigationDrawer(
@@ -137,7 +148,7 @@ fun CheckListScreen(
                 drawerShape = RoundedCornerShape(24.dp),
                 drawerContainerColor = colorScheme.surfaceContainer,
                 modifier = Modifier
-                    .padding(vertical = 64.dp)
+                    .padding(vertical = 36.dp)
                     .shadow(
                         elevation = 8.dp,
                         shape = RoundedCornerShape(24.dp)
@@ -217,7 +228,7 @@ fun CheckListScreen(
         },
         drawerState = drawerState,
         scrimColor = Color.Transparent,
-        modifier = Modifier.safeDrawingPadding()
+        modifier = Modifier.background(colorScheme.background)
     ) {
         Scaffold(
             topBar = {
@@ -289,7 +300,10 @@ fun CheckListScreen(
                             horizontalAlignment = Alignment.End,
                         ) {
                             ExtendedFloatingActionButton(
-                                onClick = { showSectionSelector = true },
+                                onClick = {
+                                    showSectionSelector = true
+                                    showItems = false
+                                },
                                 containerColor = colorScheme.background,
                                 elevation = FloatingActionButtonDefaults.elevation(
                                     defaultElevation = 4.dp,
@@ -298,7 +312,7 @@ fun CheckListScreen(
                                 shape = RoundedCornerShape(24.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.ShoppingCart,
+                                    imageVector = Icons.Default.Add,
                                     contentDescription = stringResource(Res.string.cd_add_section),
                                     tint = colorScheme.primary,
                                     modifier = Modifier
@@ -313,18 +327,7 @@ fun CheckListScreen(
                             }
                             ExtendedFloatingActionButton(
                                 onClick = {
-                                    addSection(
-                                        Section(
-                                            id =  (0..1000000).random().toString(),
-                                            section = GrocerySection.Custom("New Section"),
-                                            items = listOf(
-                                                SectionItem(
-                                                    name = "New Item",
-                                                    isChecked = false
-                                                )
-                                            )
-                                        )
-                                    )
+                                    showItemInserter = true
                                     showItems = false
                                 },
                                 containerColor = colorScheme.background,
@@ -335,7 +338,7 @@ fun CheckListScreen(
                                 shape = RoundedCornerShape(24.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.ShoppingCart,
+                                    imageVector = Icons.Default.Add,
                                     contentDescription = stringResource(Res.string.cd_add_item),
                                     tint = colorScheme.primary,
                                     modifier = Modifier
@@ -373,6 +376,9 @@ fun CheckListScreen(
                     }
                 }
             },
+            modifier = Modifier
+                .statusBarsPadding()
+                .safeDrawingPadding()
         ) { contentPadding ->
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
@@ -382,7 +388,7 @@ fun CheckListScreen(
                 items(sections) { section ->
                     ItemSection(
                         removeSection = removeSection,
-                        onSectionUpdate = updateSection,
+                        onUpdateSection = updateSection,
                         section = section,
                         onSwipe = {
                             swipeInCooldown = true
@@ -391,14 +397,19 @@ fun CheckListScreen(
                                 swipeInCooldown = false
                             }
                         },
-                        swipeInCooldown = swipeInCooldown
+                        swipeInCooldown = swipeInCooldown,
+                        currentlySwipedId = currentlySwipedId,
+                        onSwipeStateChange = { id ->
+                            currentlySwipedId = id
+                        },
+                        removeItemFromSection = removeItemFromSection,
                     )
                 }
             }
 
             if (showSectionSelector) {
                 var selectedSection by remember {
-                    mutableStateOf<GrocerySection>(GrocerySection.Custom(""))
+                    mutableStateOf<GrocerySection?>(null)
                 }
 
                 AlertDialog(
@@ -414,12 +425,10 @@ fun CheckListScreen(
                     confirmButton = {
                         TextButton(
                             onClick = {
-                                if (selectedSection == GrocerySection.Custom("")) {
-                                    return@TextButton
-                                }
+                                val section = selectedSection ?: return@TextButton
                                 addSection(
                                     Section(
-                                        section = selectedSection,
+                                        section = section,
                                         items = emptyList(),
                                         id = (0..1000000).random().toString()
                                     )
@@ -439,6 +448,49 @@ fun CheckListScreen(
                     }
                 )
             }
+
+            if (showItemInserter) {
+                var item by remember { mutableStateOf<SectionItem?>(null) }
+                var selectedSection by remember { mutableStateOf<Section?>(null) }
+
+                AlertDialog(
+                    onDismissRequest = { showItemInserter = false },
+                    title = { Text("Add Item") },
+                    text = {
+                        ItemInserter(
+                            sections = sections,
+                            onItemInserted = { newItem ->
+                                item = newItem
+                            },
+                            onSectionSelected = { newSection ->
+                                selectedSection = newSection
+                            }
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                val section = selectedSection ?: return@TextButton
+                                val newItem = item ?: return@TextButton
+                                addItemToSection(
+                                    section,
+                                    newItem,
+                                )
+                                showItemInserter = false
+                            }
+                        ) {
+                            Text("Add")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = { showItemInserter = false }
+                        ) {
+                            Text("Cancel")
+                        }
+                    }
+                )
+            }
         }
     }
 }
@@ -446,10 +498,13 @@ fun CheckListScreen(
 @Composable
 private fun ItemSection(
     removeSection: (Section) -> Unit,
-    onSectionUpdate: (Section) -> Unit,
+    onUpdateSection: (Section) -> Unit,
+    removeItemFromSection: (Section, SectionItem) -> Unit,
     section: Section,
     onSwipe: () -> Unit = {},
     swipeInCooldown: Boolean = false,
+    currentlySwipedId: String? = null,
+    onSwipeStateChange: (String) -> Unit,
 ) {
     var showItems by remember { mutableStateOf(false) }
     val colorScheme = MaterialTheme.colorScheme
@@ -459,15 +514,22 @@ private fun ItemSection(
             .fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        HorizontalDivider(
+            color = colorScheme.primary,
+            thickness = 1.dp,
+        )
+
         SwipeableBox(
             removeSection = removeSection,
             colorScheme = colorScheme,
             showItems = showItems,
             onClick = { showItems = !showItems },
             section = section,
-            onSectionUpdate = { onSectionUpdate(it) },
+            onUpdateSection = { onUpdateSection(it) },
             onDeleteSwipe = onSwipe,
             swipeInCooldown = swipeInCooldown,
+            isCurrentlyBeingSwiped = currentlySwipedId == section.id,
+            onSwipeStateChange = onSwipeStateChange,
         )
 
         HorizontalDivider(
@@ -480,17 +542,43 @@ private fun ItemSection(
                 modifier = Modifier
                     .fillMaxWidth()
             ) {
-                section.items?.forEachIndexed { index, item ->
+                section.items?.forEachIndexed { index, sectionItem ->
                     val color = if (index % 2 == 1) {
                         colorScheme.secondaryContainer
                     } else {
                         colorScheme.background
                     }
                     ItemRow(
-                        itemName = item.name,
-                        color = color
+                        item = sectionItem,
+                        color = color,
+                        removeItem = { item ->
+                            removeItemFromSection(section, item)
+                        },
+                        onDeleteSwipe = onSwipe,
+                        swipeInCooldown = swipeInCooldown,
+                        isCurrentlyBeingSwiped = currentlySwipedId == sectionItem.id,
+                        onSwipeStateChange = onSwipeStateChange,
                     )
                 }
+
+                // Additional placeholder row for adding new items
+                PlaceholderItemRow(
+                    onAddItem = { newItemName ->
+                        val updatedItems = (section.items ?: emptyList()) +
+                                SectionItem(
+                                    id = (0..1000000).random().toString(),
+                                    name = newItemName,
+                                    isChecked = false
+                                )
+                        onUpdateSection(section.copy(items = updatedItems))
+                    },
+                    color = if ((section.items?.size ?: 0) % 2 == 1) {
+                        colorScheme.secondaryContainer
+                    } else {
+                        colorScheme.background
+                    }
+                )
+
             }
         }
     }
@@ -503,9 +591,11 @@ private fun SwipeableBox(
     showItems: Boolean,
     onClick: () -> Unit,
     section: Section,
-    onSectionUpdate: (Section) -> Unit,
+    onUpdateSection: (Section) -> Unit,
     onDeleteSwipe: () -> Unit = {},
     swipeInCooldown: Boolean = false,
+    isCurrentlyBeingSwiped: Boolean,
+    onSwipeStateChange: (String) -> Unit,
 ) {
     val density = LocalDensity.current
     var offsetX by remember { mutableFloatStateOf(0f) }
@@ -515,30 +605,42 @@ private fun SwipeableBox(
     val fullDeleteThreshold = with(density) { -300.dp.toPx() }
 
     var showEditDialog by remember { mutableStateOf(false) }
-    val haptic = LocalHapticFeedback.current
-    var hasTriggeredHaptic by remember { mutableStateOf(false) }
     val showEditOption = offsetX > deleteThreshold
 
-    Box {
+    val haptic = LocalHapticFeedback.current
+    var hasTriggeredHaptic by remember { mutableStateOf(false) }
+
+    // Reset offset when another section is being swiped
+    LaunchedEffect(isCurrentlyBeingSwiped) {
+        if (!isCurrentlyBeingSwiped) {
+            offsetX = 0f
+        }
+    }
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+    ) {
         // Background layer
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(IntrinsicSize.Min)
+                .matchParentSize()
         ) {
             // Split background for edit and delete
             Row(
                 horizontalArrangement = Arrangement.End,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxSize()
             ) {
                 // Edit background
                 AnimatedVisibility(showEditOption) {
                     Box(
                         modifier = Modifier
-                            .height(IntrinsicSize.Min)
+                            .fillMaxHeight()
                             .background(colorScheme.tertiaryContainer)
                             .clickable { showEditDialog = true }
-                            .padding(horizontal = 32.dp, vertical = 8.dp),
+                            .padding(horizontal = 32.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -557,14 +659,14 @@ private fun SwipeableBox(
                 // Delete background
                 Box(
                     modifier = Modifier
-                        .height(IntrinsicSize.Min)
+                        .fillMaxHeight()
                         .then(deleteWidth)
                         .background(colorScheme.error)
                         .clickable {
                             removeSection(section)
                             onDeleteSwipe()
                         }
-                        .padding(horizontal = 32.dp, vertical = 8.dp),
+                        .padding(horizontal = 32.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -578,7 +680,7 @@ private fun SwipeableBox(
             // Foreground content
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .fillMaxSize()
                     .offset { IntOffset(offsetX.roundToInt(), 0) }
                     .background(colorScheme.background)
                     .clickable(
@@ -591,6 +693,8 @@ private fun SwipeableBox(
                             if (swipeInCooldown || delta > 0 && offsetX >= 0f) {
                                 return@rememberDraggableState
                             }
+                            // Notify parent that this section is being swiped
+                            onSwipeStateChange(section.id)
                             offsetX += delta
 
                             // Trigger delete if swiped past fullDeleteThreshold
@@ -614,7 +718,7 @@ private fun SwipeableBox(
                                 removeSection(section)
                                 onDeleteSwipe()
                                 offsetX = 0f
-                            // Otherwise, snap to edit/delete position or reset
+                                // Otherwise, snap to edit/delete position or reset
                             } else if (offsetX <= showOptionsStartThreshold && offsetX > deleteThreshold) {
                                 offsetX = showOptionsThreshold
                             } else if (offsetX > showOptionsStartThreshold) {
@@ -625,7 +729,7 @@ private fun SwipeableBox(
             ) {
                 Text(
                     text = section.section.displayName,
-                    fontSize = 16.sp,
+                    fontSize = 18.sp,
                     color = colorScheme.primary,
                     modifier = Modifier
                         .padding(8.dp)
@@ -670,7 +774,7 @@ private fun SwipeableBox(
                 confirmButton = {
                     TextButton(
                         onClick = {
-                            onSectionUpdate(section.copy(section = GrocerySection.Custom(newName)))
+                            onUpdateSection(section.copy(section = GrocerySection.Custom(newName)))
                             showEditDialog = false
                             offsetX = 0f
                         }
@@ -693,37 +797,145 @@ private fun SwipeableBox(
 
 @Composable
 private fun ItemRow(
-    itemName: String,
+    item: SectionItem,
     color: Color,
+    removeItem: (SectionItem) -> Unit = {},
+    onDeleteSwipe: () -> Unit = {},
+    swipeInCooldown: Boolean = false,
+    isCurrentlyBeingSwiped: Boolean,
+    onSwipeStateChange: (String) -> Unit,
 ) {
     var isChecked by remember { mutableStateOf(false) }
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
+
+    val density = LocalDensity.current
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    val showOptionsStartThreshold = with(density) { -40.dp.toPx() }
+    val showOptionsThreshold = with(density) { -90.dp.toPx() }
+    val deleteThreshold = with(density) { -200.dp.toPx() }
+    val fullDeleteThreshold = with(density) { -300.dp.toPx() }
+
+    val haptic = LocalHapticFeedback.current
+    var hasTriggeredHaptic by remember { mutableStateOf(false) }
+
+    // Reset offset when another section is being swiped
+    LaunchedEffect(isCurrentlyBeingSwiped) {
+        if (!isCurrentlyBeingSwiped) {
+            offsetX = 0f
+        }
+    }
+
+    Box(
+        contentAlignment = Alignment.Center,
         modifier = Modifier
             .fillMaxWidth()
-            .background(color)
-            .clickable(
-                interactionSource = null,
-                indication = null
-            ) { isChecked = !isChecked }
+            .height(56.dp)
     ) {
-        Text(
-            text = itemName,
-            fontSize = 16.sp,
-            color = MaterialTheme.colorScheme.primary,
+        // Background layer
+        Box(
             modifier = Modifier
-                .padding(horizontal = 16.dp)
-                .padding(vertical = 12.dp)
-        )
-        Checkbox(
-            checked = isChecked,
-            onCheckedChange = { isChecked = it },
-            modifier = Modifier
-                .padding(horizontal = 16.dp)
-                .padding(vertical = 12.dp)
-                .size(16.dp)
-        )
+                .matchParentSize()
+        ) {
+            // Split background for edit and delete
+            Row(
+                horizontalArrangement = Arrangement.End,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                val deleteWidth = if (offsetX > deleteThreshold)
+                    Modifier.width(IntrinsicSize.Min)
+                else
+                    Modifier.fillMaxWidth()
+
+                // Delete background
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .then(deleteWidth)
+                        .background(MaterialTheme.colorScheme.error)
+                        .clickable {
+                            removeItem(item)
+                            onDeleteSwipe()
+                        }
+                        .padding(horizontal = 32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = stringResource(Res.string.cd_delete_icon),
+                        tint = MaterialTheme.colorScheme.onError
+                    )
+                }
+            }
+
+            // Foreground content
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .offset { IntOffset(offsetX.roundToInt(), 0) }
+                    .background(color)
+                    .clickable(
+                        interactionSource = null,
+                        indication = null
+                    ) { isChecked = !isChecked }
+                    .draggable(
+                        orientation = Orientation.Horizontal,
+                        state = rememberDraggableState { delta ->
+                            if (swipeInCooldown || delta > 0 && offsetX >= 0f) {
+                                return@rememberDraggableState
+                            }
+                            // Notify parent that this section is being swiped
+                            onSwipeStateChange(item.id)
+                            offsetX += delta
+
+                            // Trigger delete if swiped past fullDeleteThreshold
+                            if (offsetX < fullDeleteThreshold) {
+                                removeItem(item)
+                                onDeleteSwipe()
+                                offsetX = 0f
+                            }
+
+                            // Haptic feedback
+                            if (offsetX < fullDeleteThreshold * 0.8f && !hasTriggeredHaptic) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                hasTriggeredHaptic = true
+                            } else if (offsetX > fullDeleteThreshold * 0.8f) {
+                                hasTriggeredHaptic = false
+                            }
+                        },
+                        onDragStopped = {
+                            // Delete row if swiped past deleteThreshold
+                            if (offsetX <= deleteThreshold) {
+                                removeItem(item)
+                                onDeleteSwipe()
+                                offsetX = 0f
+                                // Otherwise, snap to edit/delete position or reset
+                            } else if (offsetX <= showOptionsStartThreshold && offsetX > deleteThreshold) {
+                                offsetX = showOptionsThreshold
+                            } else if (offsetX > showOptionsStartThreshold) {
+                                offsetX = 0f
+                            }
+                        }
+                    ),
+            ) {
+                Text(
+                    text = item.name,
+                    fontSize = 16.sp,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier
+                        .padding(horizontal = 24.dp)
+                        .padding(vertical = 16.dp)
+                )
+                Checkbox(
+                    checked = isChecked,
+                    onCheckedChange = { isChecked = it },
+                    modifier = Modifier
+                        .padding(horizontal = 24.dp)
+                        .padding(vertical = 16.dp)
+                        .size(16.dp)
+                )
+            }
+        }
     }
 }
 
@@ -738,14 +950,17 @@ fun CheckListScreenPreview() {
                     section = GrocerySection.Custom("Section 1"),
                     items = listOf(
                         SectionItem(
+                            id = "id",
                             name = "Item 1",
                             isChecked = false
                         ),
                         SectionItem(
+                            id = "id",
                             name = "Item 2",
                             isChecked = true
                         ),
                         SectionItem(
+                            id = "id",
                             name = "Item 3",
                             isChecked = false
                         ),
@@ -756,14 +971,17 @@ fun CheckListScreenPreview() {
                     section = GrocerySection.Custom("Section 2"),
                     items = listOf(
                         SectionItem(
+                            id = "id",
                             name = "Item 1",
                             isChecked = false
                         ),
                         SectionItem(
+                            id = "id",
                             name = "Item 2",
                             isChecked = true
                         ),
                         SectionItem(
+                            id = "id",
                             name = "Item 3",
                             isChecked = false
                         ),
@@ -775,6 +993,8 @@ fun CheckListScreenPreview() {
             updateSection = { },
             signOut = { },
             onLogout = { },
+            addItemToSection = { _, _ -> },
+            removeItemFromSection = { _, _ -> },
         )
     }
 }
@@ -790,14 +1010,17 @@ fun CheckListScreenDarkPreview() {
                     section = GrocerySection.Custom("Section 1"),
                     items = listOf(
                         SectionItem(
+                            id = "id",
                             name = "Item 1",
                             isChecked = false
                         ),
                         SectionItem(
+                            id = "id",
                             name = "Item 2",
                             isChecked = true
                         ),
                         SectionItem(
+                            id = "id",
                             name = "Item 3",
                             isChecked = false
                         ),
@@ -808,14 +1031,17 @@ fun CheckListScreenDarkPreview() {
                     section = GrocerySection.Custom("Section 2"),
                     items = listOf(
                         SectionItem(
+                            id = "id",
                             name = "Item 1",
                             isChecked = false
                         ),
                         SectionItem(
+                            id = "id",
                             name = "Item 2",
                             isChecked = true
                         ),
                         SectionItem(
+                            id = "id",
                             name = "Item 3",
                             isChecked = false
                         ),
@@ -827,6 +1053,8 @@ fun CheckListScreenDarkPreview() {
             updateSection = { },
             signOut = { },
             onLogout = { },
+            addItemToSection = { _, _ -> },
+            removeItemFromSection = { _, _ -> },
         )
     }
 }
