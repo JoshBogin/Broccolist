@@ -1,11 +1,11 @@
 package com.broccolist.di
 
+import org.koin.core.KoinApplication
 import org.koin.core.context.startKoin
-import org.koin.dsl.KoinAppDeclaration
 
-fun initKoin(config: KoinAppDeclaration? = null) {
+fun initKoin(additionalConfiguration: KoinApplication.() -> Unit = {}) {
     startKoin {
-        config?.invoke(this)
         modules(sharedModule, platformModule, supabaseModule, dataModule)
+        additionalConfiguration()
     }
 }

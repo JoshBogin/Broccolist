@@ -6,19 +6,22 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
-import com.broccolist.app.App
+import com.broccolist.app.presentation.App
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
+import io.github.jan.supabase.auth.handleDeeplinks
+import org.koin.android.ext.android.inject
 
 class MainActivity : ComponentActivity() {
+    private val viewModel: MainViewModel by inject()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         installSplashScreen()
+        viewModel.supabaseClient.handleDeeplinks(intent)
 
         enableEdgeToEdge()
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -45,13 +48,6 @@ class MainActivity : ComponentActivity() {
                 }
                 App()
             }
-
         }
     }
-}
-
-@Preview
-@Composable
-fun AppAndroidPreview() {
-    App()
 }

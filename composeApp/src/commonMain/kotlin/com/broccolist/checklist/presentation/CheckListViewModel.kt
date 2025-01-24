@@ -1,6 +1,6 @@
 package com.broccolist.checklist.presentation
 
-import com.broccolist.app.MPViewModel
+import com.broccolist.app.presentation.MPViewModel
 import com.broccolist.checklist.domain.Section
 import com.broccolist.checklist.domain.SectionItem
 import io.github.jan.supabase.SupabaseClient

@@ -1,4 +1,4 @@
-package com.broccolist.checklist.presentation.Components
+package com.broccolist.checklist.presentation.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -26,18 +26,17 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 
 @Composable
 fun PlaceholderItemRow(
+    focusRequester: FocusRequester,
     onAddItem: (String) -> Unit,
     color: Color
 ) {
     var newItemName by remember { mutableStateOf("") }
-    val focusManager = LocalFocusManager.current
-    val focusRequester = remember { FocusRequester() }
     var isFocused by remember { mutableStateOf(false) }
 
     Row(
@@ -60,23 +59,25 @@ fun PlaceholderItemRow(
             onValueChange = { newItemName = it },
             placeholder = {
                 Text(
-                    text = "Enter item name",
+                    text = "Add Item",
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+                    fontStyle = FontStyle.Italic
                 )
             },
             singleLine = true,
             modifier = Modifier
                 .weight(1f)
                 .padding(horizontal = 8.dp)
+                .focusRequester(focusRequester)
                 .onFocusChanged {
                     isFocused = it.isFocused
-                }
-                .focusRequester(focusRequester),
+                },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = {
                 if (newItemName.isNotBlank()) {
                     onAddItem(newItemName)
                     newItemName = ""
+//                    focusRequester.requestFocus()
                 }
             }),
             colors = TextFieldDefaults.colors(

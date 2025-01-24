@@ -13,7 +13,7 @@ object BroccolistColors {
     val ModalSheetLightGray = Color(0xFFFAFAFA)
     val ModalSheetDarkGray = Color(0xFF1C1C1C)
     val EditGray = Color(0xFFE5E5E5)
-    val EditGrayDark = Color(0xFFE5E5E5)
+    val EditGrayDark = Color(0xFF252525)
 
     // System colors
     val White = Color(0xFFFFFFFF)

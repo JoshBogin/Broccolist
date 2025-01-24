@@ -18,8 +18,26 @@
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
 	<string>1.0</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.broccolist.Broccolist</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>io.supabase.broccolist</string>
+                <string>com.googleusercontent.apps.299296791038-hi3i5rcti7g827hv1on3ckl5pjov4lrq</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>GIDClientID</key>
+	<string>299296791038-hi3i5rcti7g827hv1on3ckl5pjov4lrq.apps.googleusercontent.com</string>
+	<key>GIDServerClientID</key>
+	<string>299296791038-in8oqrmivn8f7a096lgn7if70v32qsth.apps.googleusercontent.com</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

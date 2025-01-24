@@ -1,4 +1,4 @@
-package com.broccolist.checklist.presentation.Components
+package com.broccolist.checklist.presentation.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column

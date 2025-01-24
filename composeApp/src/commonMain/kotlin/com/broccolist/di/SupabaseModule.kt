@@ -12,7 +12,7 @@ import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.realtime.Realtime
 import org.koin.dsl.module
 
-expect fun AuthConfig.platformGoTrueConfig()
+expect fun AuthConfig.platformAuthConfig()
 
 val supabaseModule = module {
     single {
@@ -21,11 +21,11 @@ val supabaseModule = module {
             supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5ZGl0a2lxd3dqb3B6enpxbGxtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY4MDIwNzUsImV4cCI6MjA1MjM3ODA3NX0.WU83Gqtdb7kNlRO6qoX3slTcm6I57qMKDSeHzOVtfP8"
         ) {
             install(Auth) {
-                platformGoTrueConfig()
+                platformAuthConfig()
                 flowType = FlowType.PKCE
             }
             install(ComposeAuth) {
-                googleNativeLogin("299296791038-in8oqrmivn8f7a096lgn7if70v32qsth.apps.googleusercontent.com") //Use the Web Client ID, not the Android one!
+                googleNativeLogin("299296791038-in8oqrmivn8f7a096lgn7if70v32qsth.apps.googleusercontent.com") // Web Client ID
                 appleNativeLogin()
             }
             defaultLogLevel = LogLevel.DEBUG

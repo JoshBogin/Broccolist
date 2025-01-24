@@ -3,7 +3,7 @@
 
     <!-- Login Screen -->
     <string name="login_title">Welcome to Broccolist</string>
-    <string name="login_subtitle">Please sign in with your provider</string>
+    <string name="login_subtitle">Use a provider to sign in</string>
     <string name="cd_broccolist_icon">Broccolist Icon</string>
     <string name="login_error">An error occurred</string>
 

@@ -1,8 +1,9 @@
 package com.broccolist.di
 
-import com.broccolist.app.AppViewModel
+import com.broccolist.app.presentation.AppViewModel
 import com.broccolist.checklist.presentation.CheckListViewModel
 import com.broccolist.core.data.HttpClientFactory
+import com.broccolist.login.presentation.LoginViewModel
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
@@ -14,13 +15,5 @@ val sharedModule = module {
 
     viewModelOf(::CheckListViewModel)
     viewModelOf(::AppViewModel)
-//    singleOf(::KtorRemoteBookDataSource).bind<RemoteBookDataSource>()
-//    singleOf(::DefaultBookRepository).bind<BookRepository>()
-//
-//    single {
-//        get<DatabaseFactory>().create()
-//            .setDriver(BundledSQLiteDriver())
-//            .build()
-//    }
-//    single { get<FavoriteBookDatabase>().favoriteBookDao }
+    viewModelOf(::LoginViewModel)
 }

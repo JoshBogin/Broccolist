@@ -1,4 +1,4 @@
-package com.broccolist.app
+package com.broccolist.app.presentation
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.broccolist.app.data.Route
 import io.github.jan.supabase.auth.status.SessionStatus
 
 @Composable
@@ -21,6 +22,7 @@ fun AuthenticatedContent(
 ) {
     when (sessionStatus) {
         is SessionStatus.NotAuthenticated -> {
+            println("Not authenticated")
             LaunchedEffect(Unit) {
                 navController.navigate(Route.Login) {
                     popUpTo(Route.CheckList) { inclusive = true }
@@ -28,6 +30,7 @@ fun AuthenticatedContent(
             }
         }
         is SessionStatus.Authenticated -> {
+            println("Authenticated")
             content()
         }
         is SessionStatus.Initializing -> {

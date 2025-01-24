@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
@@ -69,10 +70,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -95,9 +99,9 @@ import broccolist.composeapp.generated.resources.sign_out
 import com.broccolist.checklist.domain.GrocerySection
 import com.broccolist.checklist.domain.Section
 import com.broccolist.checklist.domain.SectionItem
-import com.broccolist.checklist.presentation.Components.ItemInserter
-import com.broccolist.checklist.presentation.Components.PlaceholderItemRow
-import com.broccolist.checklist.presentation.Components.SectionSelector
+import com.broccolist.checklist.presentation.components.ItemInserter
+import com.broccolist.checklist.presentation.components.PlaceholderItemRow
+import com.broccolist.checklist.presentation.components.SectionSelector
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
@@ -134,6 +138,10 @@ fun CheckListScreen(
     signOut: suspend () -> Unit,
     onLogout: () -> Unit,
 ) {
+    val focusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val scrollState = rememberLazyListState()
     val drawerState: DrawerState = rememberDrawerState(DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
     var swipeInCooldown by remember { mutableStateOf(false) }
@@ -142,13 +150,22 @@ fun CheckListScreen(
     var showItemInserter by remember { mutableStateOf(false) }
     val colorScheme = MaterialTheme.colorScheme
 
+    LaunchedEffect(scrollState) {
+        if (scrollState.isScrollInProgress) {
+            keyboardController?.hide()
+            focusManager.clearFocus()
+        }
+    }
+
     ModalNavigationDrawer(
         drawerContent = {
             ModalDrawerSheet(
                 drawerShape = RoundedCornerShape(24.dp),
                 drawerContainerColor = colorScheme.surfaceContainer,
                 modifier = Modifier
-                    .padding(vertical = 36.dp)
+                    .safeDrawingPadding()
+                    .padding(horizontal = 4.dp)
+                    .padding(vertical = 16.dp)
                     .shadow(
                         elevation = 8.dp,
                         shape = RoundedCornerShape(24.dp)
@@ -242,6 +259,7 @@ fun CheckListScreen(
                             coroutineScope.launch {
                                 drawerState.open()
                             }
+                            focusManager.clearFocus()
                         },
                         modifier = Modifier
                             .padding(16.dp)
@@ -265,7 +283,9 @@ fun CheckListScreen(
                             .align(Alignment.Center)
                     )
                     IconButton(
-                        onClick = {},
+                        onClick = {
+                            focusManager.clearFocus()
+                        },
                         modifier = Modifier
                             .padding(16.dp)
                             .size(32.dp)
@@ -303,6 +323,7 @@ fun CheckListScreen(
                                 onClick = {
                                     showSectionSelector = true
                                     showItems = false
+                                    focusManager.clearFocus()
                                 },
                                 containerColor = colorScheme.background,
                                 elevation = FloatingActionButtonDefaults.elevation(
@@ -379,14 +400,21 @@ fun CheckListScreen(
             modifier = Modifier
                 .statusBarsPadding()
                 .safeDrawingPadding()
+                .clickable(
+                    onClick = { focusManager.clearFocus() },
+                    indication = null,
+                    interactionSource = null,
+                )
         ) { contentPadding ->
             LazyColumn(
+                state = scrollState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = contentPadding,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 items(sections) { section ->
                     ItemSection(
+                        focusRequester = focusRequester,
                         removeSection = removeSection,
                         onUpdateSection = updateSection,
                         section = section,
@@ -497,6 +525,7 @@ fun CheckListScreen(
 
 @Composable
 private fun ItemSection(
+    focusRequester: FocusRequester,
     removeSection: (Section) -> Unit,
     onUpdateSection: (Section) -> Unit,
     removeItemFromSection: (Section, SectionItem) -> Unit,
@@ -563,6 +592,7 @@ private fun ItemSection(
 
                 // Additional placeholder row for adding new items
                 PlaceholderItemRow(
+                    focusRequester = focusRequester,
                     onAddItem = { newItemName ->
                         val updatedItems = (section.items ?: emptyList()) +
                                 SectionItem(
@@ -597,6 +627,7 @@ private fun SwipeableBox(
     isCurrentlyBeingSwiped: Boolean,
     onSwipeStateChange: (String) -> Unit,
 ) {
+    val focusManager = LocalFocusManager.current
     val density = LocalDensity.current
     var offsetX by remember { mutableFloatStateOf(0f) }
     val showOptionsStartThreshold = with(density) { -80.dp.toPx() }
@@ -686,13 +717,18 @@ private fun SwipeableBox(
                     .clickable(
                         interactionSource = null,
                         indication = null
-                    ) { onClick() }
+                    ) {
+                        onClick()
+                        focusManager.clearFocus()
+                    }
                     .draggable(
                         orientation = Orientation.Horizontal,
                         state = rememberDraggableState { delta ->
                             if (swipeInCooldown || delta > 0 && offsetX >= 0f) {
                                 return@rememberDraggableState
                             }
+                            // Clear focus when swiping
+                            focusManager.clearFocus()
                             // Notify parent that this section is being swiped
                             onSwipeStateChange(section.id)
                             offsetX += delta
@@ -807,6 +843,7 @@ private fun ItemRow(
 ) {
     var isChecked by remember { mutableStateOf(false) }
 
+    val focusManager = LocalFocusManager.current
     val density = LocalDensity.current
     var offsetX by remember { mutableFloatStateOf(0f) }
     val showOptionsStartThreshold = with(density) { -40.dp.toPx() }
@@ -877,13 +914,18 @@ private fun ItemRow(
                     .clickable(
                         interactionSource = null,
                         indication = null
-                    ) { isChecked = !isChecked }
+                    ) {
+                        isChecked = !isChecked
+                        focusManager.clearFocus()
+                    }
                     .draggable(
                         orientation = Orientation.Horizontal,
                         state = rememberDraggableState { delta ->
                             if (swipeInCooldown || delta > 0 && offsetX >= 0f) {
                                 return@rememberDraggableState
                             }
+                            // clear focus from text field when swiping
+                            focusManager.clearFocus()
                             // Notify parent that this section is being swiped
                             onSwipeStateChange(item.id)
                             offsetX += delta

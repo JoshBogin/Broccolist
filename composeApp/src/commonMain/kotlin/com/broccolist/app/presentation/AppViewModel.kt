@@ -1,8 +1,7 @@
-package com.broccolist.app
+package com.broccolist.app.presentation
 
 import androidx.lifecycle.ViewModel
 import com.broccolist.core.data.AuthApi
-import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
@@ -13,10 +12,11 @@ expect open class MPViewModel() : ViewModel {
 }
 
 class AppViewModel(
-    val supabaseClient: SupabaseClient,
     authApi: AuthApi
 ) : MPViewModel() {
-
-    val sessionStatus = authApi.sessionStatus().stateIn(coroutineScope, SharingStarted.Eagerly, SessionStatus.NotAuthenticated(false))
-
+    val sessionStatus = authApi.sessionStatus().stateIn(
+        scope = coroutineScope,
+        started = SharingStarted.Eagerly,
+        initialValue = SessionStatus.NotAuthenticated(false),
+    )
 }

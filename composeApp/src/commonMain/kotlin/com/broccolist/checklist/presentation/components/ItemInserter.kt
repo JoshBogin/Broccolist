@@ -1,4 +1,4 @@
-package com.broccolist.checklist.presentation.Components
+package com.broccolist.checklist.presentation.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -76,55 +76,62 @@ fun ItemInserter(
                 onDismissRequest = { expandedDropdown = false }
             ) {
                 // Existing sections
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            text = "-- Current Sections --",
-                            fontWeight = FontWeight.Bold,
-                        )
-                    },
-                    onClick = { /* do nothing */ },
-                )
-                sections.forEach { section ->
+                if (sections.isNotEmpty()) {
                     DropdownMenuItem(
-                        text = { Text(section.section.displayName) },
-                        onClick = {
-                            selectedSection = section.section.displayName
-                            onSectionSelected(section)
-                            showCustomTextField = false
-                            expandedDropdown = false
-                        }
+                        text = {
+                            Text(
+                                text = "-- Current Sections --",
+                                fontWeight = FontWeight.Bold,
+                            )
+                        },
+                        onClick = { /* do nothing */ },
                     )
+                    sections.forEach { section ->
+                        DropdownMenuItem(
+                            text = { Text(section.section.displayName) },
+                            onClick = {
+                                selectedSection = section.section.displayName
+                                onSectionSelected(section)
+                                showCustomTextField = false
+                                expandedDropdown = false
+                            }
+                        )
+                    }
                 }
 
                 // Unused predefined sections
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            text = "-- Unused Sections --",
-                            fontWeight = FontWeight.Bold,
-                        )
-                    },
-                    onClick = { /* do nothing */ },
-                )
-                GrocerySection.getPredefinedSections().filter { section ->
+                val unUsedSections = GrocerySection.getPredefinedSections().filter { section ->
                     section !in sections.map { it.section }
-                }.forEach { section ->
+                }
+                if (unUsedSections.isNotEmpty()) {
                     DropdownMenuItem(
-                        text = { Text(section.displayName) },
-                        onClick = {
-                            selectedSection = section.displayName
-                            onSectionSelected(
-                                Section(
-                                    id = (0..1000000).random().toString(),
-                                    section = section,
-                                    items = emptyList()
-                                )
+                        text = {
+                            Text(
+                                text = "-- Unused Sections --",
+                                fontWeight = FontWeight.Bold,
                             )
-                            showCustomTextField = false
-                            expandedDropdown = false
-                        }
+                        },
+                        onClick = { /* do nothing */ },
                     )
+                    GrocerySection.getPredefinedSections().filter { section ->
+                        section !in sections.map { it.section }
+                    }.forEach { section ->
+                        DropdownMenuItem(
+                            text = { Text(section.displayName) },
+                            onClick = {
+                                selectedSection = section.displayName
+                                onSectionSelected(
+                                    Section(
+                                        id = (0..1000000).random().toString(),
+                                        section = section,
+                                        items = emptyList()
+                                    )
+                                )
+                                showCustomTextField = false
+                                expandedDropdown = false
+                            }
+                        )
+                    }
                 }
 
                 // Custom section option

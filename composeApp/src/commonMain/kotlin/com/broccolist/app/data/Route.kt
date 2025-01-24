@@ -1,4 +1,4 @@
-package com.broccolist.app
+package com.broccolist.app.data
 
 import kotlinx.serialization.Serializable
 

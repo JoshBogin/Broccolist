@@ -1,4 +1,4 @@
-package com.broccolist.app
+package com.broccolist.app.presentation
 
 import BroccolistTheme.BroccolistTheme
 import androidx.compose.animation.slideInHorizontally
@@ -11,10 +11,10 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
+import com.broccolist.app.data.Route
 import com.broccolist.checklist.presentation.CheckListScreenRoute
 import com.broccolist.checklist.presentation.CheckListViewModel
 import com.broccolist.login.presentation.LoginScreenRoute
-import io.github.jan.supabase.compose.auth.composeAuth
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -24,7 +24,6 @@ fun App(
     viewModel: AppViewModel = koinViewModel()
 ) {
     val sessionStatus by viewModel.sessionStatus.collectAsState()
-    val supabaseClient = viewModel.supabaseClient
 
     BroccolistTheme(
         darkTheme = isSystemInDarkTheme()
@@ -63,7 +62,6 @@ fun App(
                     popEnterTransition = { slideInHorizontally() }
                 ) {
                     LoginScreenRoute(
-                        supabaseAuth = supabaseClient.composeAuth,
                         onLoginSuccess = {
                             navController.navigate(Route.CheckList) {
                                 popUpTo(Route.Login) { inclusive = true }
@@ -73,6 +71,5 @@ fun App(
                 }
             }
         }
-
     }
 }
