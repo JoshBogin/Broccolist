@@ -27,6 +27,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ItemInserter(
+    listId: Int,
     sections: List<Section>,
     onItemInserted: (SectionItem) -> Unit,
     onSectionSelected: (Section) -> Unit // need to use this to check if section exists or not
@@ -46,9 +47,10 @@ fun ItemInserter(
             onValueChange = {
                 itemName = it
                 onItemInserted(SectionItem(
-                    id = (0..1000000).random().toString(),
+                    id = (0..1000000).random(),
                     name = it,
-                    isChecked = false
+                    isChecked = false,
+                    sectionId = (0..1000000).random(),
                 ))
             },
             label = { Text("Item Name") },
@@ -122,9 +124,10 @@ fun ItemInserter(
                                 selectedSection = section.displayName
                                 onSectionSelected(
                                     Section(
-                                        id = (0..1000000).random().toString(),
+                                        id = (0..1000000).random(),
                                         section = section,
-                                        items = emptyList()
+                                        items = emptyList(),
+                                        listId = listId,
                                     )
                                 )
                                 showCustomTextField = false
@@ -159,9 +162,10 @@ fun ItemInserter(
                     customSectionName = it
                     onSectionSelected(
                         Section(
-                            id = (0..1000000).random().toString(),
+                            id = (0..1000000).random(),
                             section = GrocerySection.Custom(it),
-                            items = emptyList()
+                            items = emptyList(),
+                            listId = listId,
                         )
                     )
                 },
@@ -176,6 +180,7 @@ fun ItemInserter(
 @Composable
 fun ItemInserterPreview() {
     ItemInserter(
+        listId = 0,
         sections = emptyList(),
         onItemInserted = {},
         onSectionSelected = {},

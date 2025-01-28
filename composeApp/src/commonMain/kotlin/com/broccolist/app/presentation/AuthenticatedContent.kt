@@ -13,12 +13,13 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.broccolist.app.data.Route
 import io.github.jan.supabase.auth.status.SessionStatus
+import io.github.jan.supabase.auth.user.UserSession
 
 @Composable
 fun AuthenticatedContent(
     sessionStatus: SessionStatus,
     navController: NavController,
-    content: @Composable () -> Unit
+    content: @Composable (UserSession) -> Unit
 ) {
     when (sessionStatus) {
         is SessionStatus.NotAuthenticated -> {
@@ -31,7 +32,7 @@ fun AuthenticatedContent(
         }
         is SessionStatus.Authenticated -> {
             println("Authenticated")
-            content()
+            content(sessionStatus.session)
         }
         is SessionStatus.Initializing -> {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {

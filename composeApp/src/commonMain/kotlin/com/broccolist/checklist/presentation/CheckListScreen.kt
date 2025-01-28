@@ -102,6 +102,7 @@ import com.broccolist.checklist.domain.SectionItem
 import com.broccolist.checklist.presentation.components.ItemInserter
 import com.broccolist.checklist.presentation.components.PlaceholderItemRow
 import com.broccolist.checklist.presentation.components.SectionSelector
+import io.github.jan.supabase.auth.user.UserSession
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
@@ -113,9 +114,13 @@ import kotlin.math.roundToInt
 @Composable
 fun CheckListScreenRoute(
     viewModel: CheckListViewModel = koinViewModel(),
+    userSession: UserSession?,
+    listId: Int,
     onLogout: () -> Unit,
 ) {
     CheckListScreen(
+        listId = listId,
+        getSections = viewModel::getSections,
         sections = viewModel.sections.collectAsStateWithLifecycle().value,
         addSection = viewModel::addSection,
         removeSection = viewModel::removeSection,
@@ -129,13 +134,15 @@ fun CheckListScreenRoute(
 
 @Composable
 fun CheckListScreen(
+    listId: Int,
+    getSections: (Int) -> Unit,
     sections: List<Section>,
     addSection: (Section) -> Unit,
     removeSection: (Section) -> Unit,
     updateSection: (Section) -> Unit,
     addItemToSection: (Section, SectionItem) -> Unit,
     removeItemFromSection: (Section, SectionItem) -> Unit,
-    signOut: suspend () -> Unit,
+    signOut: () -> Unit,
     onLogout: () -> Unit,
 ) {
     val focusRequester = remember { FocusRequester() }
@@ -145,11 +152,15 @@ fun CheckListScreen(
     val drawerState: DrawerState = rememberDrawerState(DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
     var swipeInCooldown by remember { mutableStateOf(false) }
-    var currentlySwipedId by remember { mutableStateOf<String?>(null) }
+    var currentlySwipedId by remember { mutableStateOf<Int?>(null) }
     var showSectionSelector by remember { mutableStateOf(false) }
     var showItemInserter by remember { mutableStateOf(false) }
     val colorScheme = MaterialTheme.colorScheme
 
+    LaunchedEffect(Unit) {
+        getSections(listId)
+    }
+    
     LaunchedEffect(scrollState) {
         if (scrollState.isScrollInProgress) {
             keyboardController?.hide()
@@ -220,10 +231,8 @@ fun CheckListScreen(
                     }
                     Button(
                         onClick = {
-                            coroutineScope.launch {
-                                signOut()
-                                onLogout()
-                            }
+                            signOut()
+                            onLogout()
                         },
                         shape = RoundedCornerShape(24.dp),
                         colors = ButtonDefaults.buttonColors(
@@ -458,8 +467,9 @@ fun CheckListScreen(
                                     Section(
                                         section = section,
                                         items = emptyList(),
-                                        id = (0..1000000).random().toString()
-                                    )
+                                        id = (0..1000000).random(),
+                                        listId = listId
+                                    ),
                                 )
                                 showSectionSelector = false
                             }
@@ -492,7 +502,8 @@ fun CheckListScreen(
                             },
                             onSectionSelected = { newSection ->
                                 selectedSection = newSection
-                            }
+                            },
+                            listId = listId,
                         )
                     },
                     confirmButton = {
@@ -532,8 +543,8 @@ private fun ItemSection(
     section: Section,
     onSwipe: () -> Unit = {},
     swipeInCooldown: Boolean = false,
-    currentlySwipedId: String? = null,
-    onSwipeStateChange: (String) -> Unit,
+    currentlySwipedId: Int? = null,
+    onSwipeStateChange: (Int) -> Unit,
 ) {
     var showItems by remember { mutableStateOf(false) }
     val colorScheme = MaterialTheme.colorScheme
@@ -596,9 +607,10 @@ private fun ItemSection(
                     onAddItem = { newItemName ->
                         val updatedItems = (section.items ?: emptyList()) +
                                 SectionItem(
-                                    id = (0..1000000).random().toString(),
+                                    id = (0..1000000).random(),
                                     name = newItemName,
-                                    isChecked = false
+                                    isChecked = false,
+                                    sectionId = section.id
                                 )
                         onUpdateSection(section.copy(items = updatedItems))
                     },
@@ -625,7 +637,7 @@ private fun SwipeableBox(
     onDeleteSwipe: () -> Unit = {},
     swipeInCooldown: Boolean = false,
     isCurrentlyBeingSwiped: Boolean,
-    onSwipeStateChange: (String) -> Unit,
+    onSwipeStateChange: (Int) -> Unit,
 ) {
     val focusManager = LocalFocusManager.current
     val density = LocalDensity.current
@@ -839,7 +851,7 @@ private fun ItemRow(
     onDeleteSwipe: () -> Unit = {},
     swipeInCooldown: Boolean = false,
     isCurrentlyBeingSwiped: Boolean,
-    onSwipeStateChange: (String) -> Unit,
+    onSwipeStateChange: (Int) -> Unit,
 ) {
     var isChecked by remember { mutableStateOf(false) }
 
@@ -986,48 +998,58 @@ private fun ItemRow(
 fun CheckListScreenPreview() {
     BroccolistTheme {
         CheckListScreen(
+            listId = 0,
+            getSections = { },
             sections = listOf(
                 Section(
-                    id = "id",
+                    id = 0,
                     section = GrocerySection.Custom("Section 1"),
                     items = listOf(
                         SectionItem(
-                            id = "id",
+                            id = 0,
                             name = "Item 1",
-                            isChecked = false
+                            isChecked = false,
+                            sectionId = 0,
                         ),
                         SectionItem(
-                            id = "id",
+                            id = 1,
                             name = "Item 2",
-                            isChecked = true
+                            isChecked = true,
+                            sectionId = 0,
                         ),
                         SectionItem(
-                            id = "id",
+                            id = 2,
                             name = "Item 3",
-                            isChecked = false
+                            isChecked = false,
+                            sectionId = 0,
                         ),
-                    )
+                    ),
+                    listId = 0,
                 ),
                 Section(
-                    id = "id",
+                    id = 1,
                     section = GrocerySection.Custom("Section 2"),
                     items = listOf(
                         SectionItem(
-                            id = "id",
+                            id = 0,
                             name = "Item 1",
-                            isChecked = false
+                            isChecked = false,
+                            sectionId = 1,
                         ),
                         SectionItem(
-                            id = "id",
+                            id = 1,
                             name = "Item 2",
-                            isChecked = true
+                            isChecked = true,
+                            sectionId = 1,
                         ),
                         SectionItem(
-                            id = "id",
+                            id = 2,
                             name = "Item 3",
-                            isChecked = false
+                            isChecked = false,
+                            sectionId = 1,
                         ),
-                    )
+                    ),
+                    listId = 0,
                 ),
             ),
             addSection = { },
@@ -1046,48 +1068,58 @@ fun CheckListScreenPreview() {
 fun CheckListScreenDarkPreview() {
     BroccolistTheme(darkTheme = true) {
         CheckListScreen(
+            listId = 1,
+            getSections = { },
             sections = listOf(
                 Section(
-                    id = "id",
+                    id = 0,
                     section = GrocerySection.Custom("Section 1"),
                     items = listOf(
                         SectionItem(
-                            id = "id",
+                            id = 0,
                             name = "Item 1",
-                            isChecked = false
+                            isChecked = false,
+                            sectionId = 0,
                         ),
                         SectionItem(
-                            id = "id",
+                            id = 1,
                             name = "Item 2",
-                            isChecked = true
+                            isChecked = true,
+                            sectionId = 0,
                         ),
                         SectionItem(
-                            id = "id",
+                            id = 2,
                             name = "Item 3",
-                            isChecked = false
+                            isChecked = false,
+                            sectionId = 0,
                         ),
-                    )
+                    ),
+                    listId = 1,
                 ),
                 Section(
-                    id = "id",
+                    id = 1,
                     section = GrocerySection.Custom("Section 2"),
                     items = listOf(
                         SectionItem(
-                            id = "id",
+                            id = 0,
                             name = "Item 1",
-                            isChecked = false
+                            isChecked = false,
+                            sectionId = 1,
                         ),
                         SectionItem(
-                            id = "id",
+                            id = 1,
                             name = "Item 2",
-                            isChecked = true
+                            isChecked = true,
+                            sectionId = 1,
                         ),
                         SectionItem(
-                            id = "id",
+                            id = 2,
                             name = "Item 3",
-                            isChecked = false
+                            isChecked = false,
+                            sectionId = 1,
                         ),
-                    )
+                    ),
+                    listId = 1,
                 ),
             ),
             addSection = { },
