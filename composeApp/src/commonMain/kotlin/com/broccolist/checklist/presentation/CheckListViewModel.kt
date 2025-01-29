@@ -1,7 +1,8 @@
 package com.broccolist.checklist.presentation
 
 import com.broccolist.app.presentation.MPViewModel
-import com.broccolist.checklist.data.CheckListRepository
+import com.broccolist.checklist.data.SupabaseRepository
+import com.broccolist.checklist.domain.CheckList
 import com.broccolist.checklist.domain.Section
 import com.broccolist.checklist.domain.SectionItem
 import io.github.jan.supabase.SupabaseClient
@@ -12,14 +13,23 @@ import kotlinx.coroutines.launch
 
 class CheckListViewModel(
     private val supabaseClient: SupabaseClient,
-    private val checkListRepository: CheckListRepository
+    private val supabaseRepository: SupabaseRepository
 ) : MPViewModel() {
     private val _sections = MutableStateFlow(listOf<Section>())
     val sections = _sections.asStateFlow()
 
+    private val _checkLists = MutableStateFlow<List<CheckList>>(emptyList())
+    val checkLists = _checkLists.asStateFlow()
+
+    fun getLists() {
+        coroutineScope.launch {
+            _checkLists.value = supabaseRepository.getCheckLists()
+        }
+    }
+
     fun getSections(listId: Int) {
         coroutineScope.launch {
-            checkListRepository.getSections(listId).let {
+            supabaseRepository.getSections(listId).let {
                 _sections.value = it
             }
         }
@@ -32,7 +42,7 @@ class CheckListViewModel(
 
         // Add the section to the database
         coroutineScope.launch {
-            checkListRepository.addSection(section)
+            supabaseRepository.addSection(section)
         }
     }
 
@@ -43,7 +53,7 @@ class CheckListViewModel(
 
         // Remove the section from the database
         coroutineScope.launch {
-            checkListRepository.removeSection(section)
+            supabaseRepository.removeSection(section)
         }
     }
 
@@ -57,7 +67,7 @@ class CheckListViewModel(
 
         // Update the section in the database
         coroutineScope.launch {
-            checkListRepository.updateSection(section)
+            supabaseRepository.updateSection(section)
         }
     }
 
@@ -78,7 +88,7 @@ class CheckListViewModel(
 
         // Add the item to the database
         coroutineScope.launch {
-            checkListRepository.addItem(item)
+            supabaseRepository.addItem(item)
         }
     }
 
@@ -94,7 +104,7 @@ class CheckListViewModel(
 
         // Remove the item from the database
         coroutineScope.launch {
-            checkListRepository.removeItem(item)
+            supabaseRepository.removeItem(item)
         }
     }
 

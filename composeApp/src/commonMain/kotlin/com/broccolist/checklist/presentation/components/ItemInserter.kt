@@ -36,7 +36,8 @@ fun ItemInserter(
     var showCustomTextField by remember { mutableStateOf(false) }
     var itemName by remember { mutableStateOf("") }
     var customSectionName by remember { mutableStateOf("") }
-    var selectedSection by remember { mutableStateOf("Select a section") }
+    var selectedSectionName by remember { mutableStateOf("Select a section") }
+    var selectedSection by remember { mutableStateOf<Section?>(null) }
 
     Column(
         verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -47,10 +48,9 @@ fun ItemInserter(
             onValueChange = {
                 itemName = it
                 onItemInserted(SectionItem(
-                    id = (0..1000000).random(),
                     name = it,
                     isChecked = false,
-                    sectionId = (0..1000000).random(),
+                    sectionId = selectedSection?.id ?: 0,
                 ))
             },
             label = { Text("Item Name") },
@@ -64,7 +64,7 @@ fun ItemInserter(
             modifier = Modifier.padding(top = 8.dp) // Add padding to balance the spacing
         ) {
             OutlinedTextField(
-                value = selectedSection,
+                value = selectedSectionName,
                 onValueChange = {},
                 readOnly = true,
                 trailingIcon = {
@@ -92,7 +92,8 @@ fun ItemInserter(
                         DropdownMenuItem(
                             text = { Text(section.section.displayName) },
                             onClick = {
-                                selectedSection = section.section.displayName
+                                selectedSectionName = section.section.displayName
+                                selectedSection = section
                                 onSectionSelected(section)
                                 showCustomTextField = false
                                 expandedDropdown = false
@@ -121,10 +122,9 @@ fun ItemInserter(
                         DropdownMenuItem(
                             text = { Text(section.displayName) },
                             onClick = {
-                                selectedSection = section.displayName
+                                selectedSectionName = section.displayName
                                 onSectionSelected(
                                     Section(
-                                        id = (0..1000000).random(),
                                         section = section,
                                         items = emptyList(),
                                         listId = listId,
@@ -146,7 +146,7 @@ fun ItemInserter(
                         )
                    },
                     onClick = {
-                        selectedSection = "Add Custom Section"
+                        selectedSectionName = "Add Custom Section"
                         showCustomTextField = true
                         expandedDropdown = false
                     }
@@ -162,7 +162,6 @@ fun ItemInserter(
                     customSectionName = it
                     onSectionSelected(
                         Section(
-                            id = (0..1000000).random(),
                             section = GrocerySection.Custom(it),
                             items = emptyList(),
                             listId = listId,

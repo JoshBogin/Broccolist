@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class ItemEntity(
-    val id: Int,
+    val id: Int? = null,
     val name: String,
     @SerialName("is_checked")
     val isChecked: Boolean,

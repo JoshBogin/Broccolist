@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class CheckListEntity(
-    val id: Int,
+    val id: Int? = null,
     @SerialName("created_at")
     val createdAt: String,
     @SerialName("edited_at")

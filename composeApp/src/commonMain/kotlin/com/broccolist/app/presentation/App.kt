@@ -44,15 +44,11 @@ fun App(
                         sessionStatus = sessionStatus,
                         navController = navController
                     ) { userSession ->
-                        val listId = (0..1000).random()
-                        viewModel.createList(userSession, listId)
-
                         val checkListViewModel = koinViewModel<CheckListViewModel>()
 
                         CheckListScreenRoute(
                             viewModel = checkListViewModel,
                             userSession = userSession,
-                            listId = listId,
                             onLogout = {
                                 navController.navigate(Route.Login) {
                                     popUpTo(Route.CheckList) { inclusive = true }

@@ -1,7 +1,7 @@
 package com.broccolist.checklist.domain
 
 data class SectionItem(
-    val id: Int,
+    val id: Int? = null,
     val name: String,
     val isChecked: Boolean,
     val sectionId: Int,

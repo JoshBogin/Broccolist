@@ -115,13 +115,24 @@ import kotlin.math.roundToInt
 fun CheckListScreenRoute(
     viewModel: CheckListViewModel = koinViewModel(),
     userSession: UserSession?,
-    listId: Int,
     onLogout: () -> Unit,
 ) {
+    val lists by viewModel.checkLists.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) {
+        viewModel.getLists()
+    }
+
+    val listId = lists.firstOrNull()?.id ?: 0
+    val sections = lists.find {
+        it.id == listId
+    }?.sections ?: emptyList()
+
+    println("CheckListScreenRoute: listId=$listId, sections=$sections")
+
     CheckListScreen(
         listId = listId,
-        getSections = viewModel::getSections,
-        sections = viewModel.sections.collectAsStateWithLifecycle().value,
+        sections = sections,
         addSection = viewModel::addSection,
         removeSection = viewModel::removeSection,
         updateSection = viewModel::updateSection,
@@ -135,7 +146,6 @@ fun CheckListScreenRoute(
 @Composable
 fun CheckListScreen(
     listId: Int,
-    getSections: (Int) -> Unit,
     sections: List<Section>,
     addSection: (Section) -> Unit,
     removeSection: (Section) -> Unit,
@@ -156,10 +166,6 @@ fun CheckListScreen(
     var showSectionSelector by remember { mutableStateOf(false) }
     var showItemInserter by remember { mutableStateOf(false) }
     val colorScheme = MaterialTheme.colorScheme
-
-    LaunchedEffect(Unit) {
-        getSections(listId)
-    }
     
     LaunchedEffect(scrollState) {
         if (scrollState.isScrollInProgress) {
@@ -467,7 +473,6 @@ fun CheckListScreen(
                                     Section(
                                         section = section,
                                         items = emptyList(),
-                                        id = (0..1000000).random(),
                                         listId = listId
                                     ),
                                 )
@@ -607,10 +612,9 @@ private fun ItemSection(
                     onAddItem = { newItemName ->
                         val updatedItems = (section.items ?: emptyList()) +
                                 SectionItem(
-                                    id = (0..1000000).random(),
                                     name = newItemName,
                                     isChecked = false,
-                                    sectionId = section.id
+                                    sectionId = section.id ?: 0
                                 )
                         onUpdateSection(section.copy(items = updatedItems))
                     },
@@ -742,7 +746,7 @@ private fun SwipeableBox(
                             // Clear focus when swiping
                             focusManager.clearFocus()
                             // Notify parent that this section is being swiped
-                            onSwipeStateChange(section.id)
+                            onSwipeStateChange(section.id ?: 0)
                             offsetX += delta
 
                             // Trigger delete if swiped past fullDeleteThreshold
@@ -939,7 +943,7 @@ private fun ItemRow(
                             // clear focus from text field when swiping
                             focusManager.clearFocus()
                             // Notify parent that this section is being swiped
-                            onSwipeStateChange(item.id)
+                            onSwipeStateChange(item.id ?: 0)
                             offsetX += delta
 
                             // Trigger delete if swiped past fullDeleteThreshold
@@ -999,7 +1003,6 @@ fun CheckListScreenPreview() {
     BroccolistTheme {
         CheckListScreen(
             listId = 0,
-            getSections = { },
             sections = listOf(
                 Section(
                     id = 0,
@@ -1069,7 +1072,6 @@ fun CheckListScreenDarkPreview() {
     BroccolistTheme(darkTheme = true) {
         CheckListScreen(
             listId = 1,
-            getSections = { },
             sections = listOf(
                 Section(
                     id = 0,
