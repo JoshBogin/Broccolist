@@ -114,30 +114,22 @@ import kotlin.math.roundToInt
 @Composable
 fun CheckListScreenRoute(
     viewModel: CheckListViewModel = koinViewModel(),
-    userSession: UserSession?,
+    userSession: UserSession,
     onLogout: () -> Unit,
 ) {
-    val lists by viewModel.checkLists.collectAsStateWithLifecycle()
-
-    LaunchedEffect(Unit) {
-        viewModel.getLists()
-    }
-
-    val listId = lists.firstOrNull()?.id ?: 0
-    val sections = lists.find {
-        it.id == listId
-    }?.sections ?: emptyList()
-
-    println("CheckListScreenRoute: listId=$listId, sections=$sections")
+    val list by viewModel.checkLists.collectAsStateWithLifecycle()
 
     CheckListScreen(
-        listId = listId,
-        sections = sections,
+        userSession = userSession,
+        listId = list?.id ?: 0,
+        sections = list?.sections ?: emptyList(),
+        getList = viewModel::getList,
         addSection = viewModel::addSection,
         removeSection = viewModel::removeSection,
         updateSection = viewModel::updateSection,
         addItemToSection = viewModel::addItemToSection,
         removeItemFromSection = viewModel::removeItemFromSection,
+        updateItem = viewModel::updateItem,
         signOut = viewModel::signOut,
         onLogout = onLogout
     )
@@ -145,13 +137,16 @@ fun CheckListScreenRoute(
 
 @Composable
 fun CheckListScreen(
+    userSession: UserSession,
     listId: Int,
     sections: List<Section>,
+    getList: (UserSession) -> Unit,
     addSection: (Section) -> Unit,
     removeSection: (Section) -> Unit,
     updateSection: (Section) -> Unit,
     addItemToSection: (Section, SectionItem) -> Unit,
     removeItemFromSection: (Section, SectionItem) -> Unit,
+    updateItem: (SectionItem) -> Unit,
     signOut: () -> Unit,
     onLogout: () -> Unit,
 ) {
@@ -166,7 +161,13 @@ fun CheckListScreen(
     var showSectionSelector by remember { mutableStateOf(false) }
     var showItemInserter by remember { mutableStateOf(false) }
     val colorScheme = MaterialTheme.colorScheme
-    
+
+    LaunchedEffect(Unit) {
+        getList(userSession)
+    }
+
+    println("CheckListScreenRoute: listId=${listId}, sections=${sections}")
+
     LaunchedEffect(scrollState) {
         if (scrollState.isScrollInProgress) {
             keyboardController?.hide()
@@ -432,6 +433,9 @@ fun CheckListScreen(
                         focusRequester = focusRequester,
                         removeSection = removeSection,
                         onUpdateSection = updateSection,
+                        addItemToSection = addItemToSection,
+                        removeItemFromSection = removeItemFromSection,
+                        updateItem = updateItem,
                         section = section,
                         onSwipe = {
                             swipeInCooldown = true
@@ -445,7 +449,6 @@ fun CheckListScreen(
                         onSwipeStateChange = { id ->
                             currentlySwipedId = id
                         },
-                        removeItemFromSection = removeItemFromSection,
                     )
                 }
             }
@@ -544,7 +547,9 @@ private fun ItemSection(
     focusRequester: FocusRequester,
     removeSection: (Section) -> Unit,
     onUpdateSection: (Section) -> Unit,
+    addItemToSection: (Section, SectionItem) -> Unit,
     removeItemFromSection: (Section, SectionItem) -> Unit,
+    updateItem: (SectionItem) -> Unit,
     section: Section,
     onSwipe: () -> Unit = {},
     swipeInCooldown: Boolean = false,
@@ -570,7 +575,7 @@ private fun ItemSection(
             showItems = showItems,
             onClick = { showItems = !showItems },
             section = section,
-            onUpdateSection = { onUpdateSection(it) },
+            onUpdateSection = onUpdateSection,
             onDeleteSwipe = onSwipe,
             swipeInCooldown = swipeInCooldown,
             isCurrentlyBeingSwiped = currentlySwipedId == section.id,
@@ -596,6 +601,7 @@ private fun ItemSection(
                     ItemRow(
                         item = sectionItem,
                         color = color,
+                        updateItem = updateItem,
                         removeItem = { item ->
                             removeItemFromSection(section, item)
                         },
@@ -610,13 +616,12 @@ private fun ItemSection(
                 PlaceholderItemRow(
                     focusRequester = focusRequester,
                     onAddItem = { newItemName ->
-                        val updatedItems = (section.items ?: emptyList()) +
-                                SectionItem(
-                                    name = newItemName,
-                                    isChecked = false,
-                                    sectionId = section.id ?: 0
-                                )
-                        onUpdateSection(section.copy(items = updatedItems))
+                        val newItem = SectionItem(
+                            name = newItemName,
+                            isChecked = false,
+                            sectionId = section.id ?: 0
+                        )
+                        addItemToSection(section, newItem)
                     },
                     color = if ((section.items?.size ?: 0) % 2 == 1) {
                         colorScheme.secondaryContainer
@@ -851,14 +856,13 @@ private fun SwipeableBox(
 private fun ItemRow(
     item: SectionItem,
     color: Color,
+    updateItem: (SectionItem) -> Unit,
     removeItem: (SectionItem) -> Unit = {},
     onDeleteSwipe: () -> Unit = {},
     swipeInCooldown: Boolean = false,
     isCurrentlyBeingSwiped: Boolean,
     onSwipeStateChange: (Int) -> Unit,
 ) {
-    var isChecked by remember { mutableStateOf(false) }
-
     val focusManager = LocalFocusManager.current
     val density = LocalDensity.current
     var offsetX by remember { mutableFloatStateOf(0f) }
@@ -931,7 +935,7 @@ private fun ItemRow(
                         interactionSource = null,
                         indication = null
                     ) {
-                        isChecked = !isChecked
+                        updateItem(item.copy(isChecked = !item.isChecked))
                         focusManager.clearFocus()
                     }
                     .draggable(
@@ -985,8 +989,8 @@ private fun ItemRow(
                         .padding(vertical = 16.dp)
                 )
                 Checkbox(
-                    checked = isChecked,
-                    onCheckedChange = { isChecked = it },
+                    checked = item.isChecked,
+                    onCheckedChange = { updateItem(item.copy(isChecked = it)) },
                     modifier = Modifier
                         .padding(horizontal = 24.dp)
                         .padding(vertical = 16.dp)
@@ -1062,6 +1066,9 @@ fun CheckListScreenPreview() {
             onLogout = { },
             addItemToSection = { _, _ -> },
             removeItemFromSection = { _, _ -> },
+            updateItem = { },
+            userSession = TODO(),
+            getList = TODO()
         )
     }
 }
@@ -1131,6 +1138,9 @@ fun CheckListScreenDarkPreview() {
             onLogout = { },
             addItemToSection = { _, _ -> },
             removeItemFromSection = { _, _ -> },
+            updateItem = { },
+            userSession = TODO(),
+            getList = TODO()
         )
     }
 }

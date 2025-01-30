@@ -5,6 +5,6 @@ data class CheckList(
     val name: String,
     val createdAt: String,
     val editedAt: String,
-    val sections: List<Section>,
+    var sections: List<Section>,
     val userId: String,
 )
