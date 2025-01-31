@@ -5,4 +5,9 @@ data class SectionItem(
     val name: String,
     val isChecked: Boolean,
     val sectionId: Int,
-)
+) {
+    fun checkEqualityWithNullId(other: SectionItem): Boolean {
+        return name == other.name &&
+            sectionId == other.sectionId
+    }
+}

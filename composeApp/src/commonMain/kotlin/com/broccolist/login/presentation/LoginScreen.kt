@@ -31,6 +31,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,7 +45,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import broccolist.composeapp.generated.resources.Res
 import broccolist.composeapp.generated.resources.broccolist_icon
 import broccolist.composeapp.generated.resources.cd_broccolist_icon
@@ -75,13 +75,13 @@ fun LoginScreenRoute(
     LoginScreen(
         onLoginSuccess = onLoginSuccess,
         supabaseAuth = viewModel.composeAuth,
-        sessionStatus = viewModel.sessionStatus.collectAsStateWithLifecycle().value,
+        sessionStatus = viewModel.sessionStatus.collectAsState().value,
         signIn = viewModel::login,
         signUp = viewModel::signUp,
         signInWithGoogle = viewModel::signInWithGoogle,
         signInWithApple = viewModel::signInWithApple,
         resetPassword = viewModel::resetPassword,
-        loginAlert = viewModel.alert.collectAsStateWithLifecycle().value,
+        loginAlert = viewModel.alert.collectAsState().value,
         resetAlert = viewModel::resetAlert,
     )
 }

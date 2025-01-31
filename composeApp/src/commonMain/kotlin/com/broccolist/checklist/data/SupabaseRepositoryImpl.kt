@@ -68,13 +68,22 @@ class SupabaseRepositoryImpl(
         }
     }
 
-    override suspend fun addSection(section: Section) {
+    override suspend fun addSection(section: Section): Section {
         client.from("sections").insert(
             SectionEntity(
                 name = section.section.displayName,
                 listId = section.listId,
             )
-        )
+        ) {
+            select()
+        }.decodeSingle<SectionEntity>().let { entity ->
+            return Section(
+                id = entity.id,
+                section = section.section,
+                items = emptyList(),
+                listId = entity.listId
+            )
+        }
     }
 
     override suspend fun removeSection(section: Section) {
@@ -97,14 +106,23 @@ class SupabaseRepositoryImpl(
         }
     }
 
-    override suspend fun addItem(item: SectionItem) {
+    override suspend fun addItem(item: SectionItem): SectionItem {
         client.from("items").insert(
             ItemEntity(
                 name = item.name,
                 isChecked = item.isChecked,
                 sectionId = item.sectionId
             )
-        )
+        ) {
+            select()
+        }.decodeSingle<ItemEntity>().let { entity ->
+            return SectionItem(
+                id = entity.id,
+                name = entity.name,
+                isChecked = entity.isChecked,
+                sectionId = entity.sectionId
+            )
+        }
     }
 
     override suspend fun removeItem(item: SectionItem) {

@@ -60,6 +60,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -80,7 +81,6 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import broccolist.composeapp.generated.resources.Res
 import broccolist.composeapp.generated.resources.add_close_icon
 import broccolist.composeapp.generated.resources.app_name
@@ -117,13 +117,15 @@ fun CheckListScreenRoute(
     userSession: UserSession,
     onLogout: () -> Unit,
 ) {
-    val list by viewModel.checkLists.collectAsStateWithLifecycle()
+    val list by viewModel.checkLists.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.getList(userSession)
+    }
 
     CheckListScreen(
-        userSession = userSession,
         listId = list?.id ?: 0,
         sections = list?.sections ?: emptyList(),
-        getList = viewModel::getList,
         addSection = viewModel::addSection,
         removeSection = viewModel::removeSection,
         updateSection = viewModel::updateSection,
@@ -137,10 +139,8 @@ fun CheckListScreenRoute(
 
 @Composable
 fun CheckListScreen(
-    userSession: UserSession,
     listId: Int,
     sections: List<Section>,
-    getList: (UserSession) -> Unit,
     addSection: (Section) -> Unit,
     removeSection: (Section) -> Unit,
     updateSection: (Section) -> Unit,
@@ -162,18 +162,14 @@ fun CheckListScreen(
     var showItemInserter by remember { mutableStateOf(false) }
     val colorScheme = MaterialTheme.colorScheme
 
-    LaunchedEffect(Unit) {
-        getList(userSession)
-    }
+    println("CheckListScreen: listId=${listId}, sections=${sections}")
 
-    println("CheckListScreenRoute: listId=${listId}, sections=${sections}")
-
-    LaunchedEffect(scrollState) {
-        if (scrollState.isScrollInProgress) {
-            keyboardController?.hide()
-            focusManager.clearFocus()
-        }
-    }
+//    LaunchedEffect(scrollState) {
+//        if (scrollState.isScrollInProgress) {
+//            keyboardController?.hide()
+//            focusManager.clearFocus()
+//        }
+//    }
 
     ModalNavigationDrawer(
         drawerContent = {
@@ -463,6 +459,7 @@ fun CheckListScreen(
                     title = { Text("Add Section") },
                     text = {
                         SectionSelector(
+                            sections = sections,
                             onSectionSelected = { newSection ->
                                 selectedSection = newSection
                             }
@@ -556,8 +553,9 @@ private fun ItemSection(
     currentlySwipedId: Int? = null,
     onSwipeStateChange: (Int) -> Unit,
 ) {
-    var showItems by remember { mutableStateOf(false) }
+    var showItems by remember { mutableStateOf(true) }
     val colorScheme = MaterialTheme.colorScheme
+    val sectionFocusRequester = remember { FocusRequester() }
 
     Column(
         modifier = Modifier
@@ -614,7 +612,7 @@ private fun ItemSection(
 
                 // Additional placeholder row for adding new items
                 PlaceholderItemRow(
-                    focusRequester = focusRequester,
+                    focusRequester = sectionFocusRequester,
                     onAddItem = { newItemName ->
                         val newItem = SectionItem(
                             name = newItemName,
@@ -1067,8 +1065,6 @@ fun CheckListScreenPreview() {
             addItemToSection = { _, _ -> },
             removeItemFromSection = { _, _ -> },
             updateItem = { },
-            userSession = TODO(),
-            getList = TODO()
         )
     }
 }
@@ -1139,8 +1135,6 @@ fun CheckListScreenDarkPreview() {
             addItemToSection = { _, _ -> },
             removeItemFromSection = { _, _ -> },
             updateItem = { },
-            userSession = TODO(),
-            getList = TODO()
         )
     }
 }

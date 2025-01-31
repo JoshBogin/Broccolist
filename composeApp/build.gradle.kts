@@ -52,6 +52,7 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtime.compose)
             implementation(libs.jetbrains.compose.navigation)
             implementation(libs.kotlinx.serialization.json)
+            implementation(libs.kotlinx.coroutines.core)
 
             implementation(libs.koin.compose)
             implementation(libs.koin.compose.viewmodel)
@@ -68,11 +69,11 @@ kotlin {
             implementation(libs.realtime.kt)
             implementation(libs.compose.auth)
             implementation(libs.compose.auth.ui)
-
         }
 
         nativeMain.dependencies {
             implementation(libs.ktor.client.darwin)
+            implementation(libs.kotlinx.coroutines.core)
         }
 
         dependencies {

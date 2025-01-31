@@ -22,6 +22,7 @@ junit = "4.13.2"
 kotlin = "2.1.0"
 navigationCompose = "2.8.0-alpha10"
 kotlinSerialization = "1.7.3"
+kotlinCoroutines = "1.9.0"
 ksp = "2.0.20-1.0.25"
 koin = "4.0.0"
 detekt = "1.23.0"
@@ -44,6 +45,7 @@ accompanist-systemuicontroller = { module = "com.google.accompanist:accompanist-
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "splashscreen" }
 
 jetbrains-compose-navigation = { group = "org.jetbrains.androidx.navigation", name = "navigation-compose", version.ref= "navigationCompose"}
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinCoroutines" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinSerialization" }
 
 androidx-credentials = { module = "androidx.credentials:credentials", version.ref = "credentials" }

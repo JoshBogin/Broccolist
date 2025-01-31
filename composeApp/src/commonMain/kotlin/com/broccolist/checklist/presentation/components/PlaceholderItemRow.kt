@@ -71,13 +71,14 @@ fun PlaceholderItemRow(
                 .focusRequester(focusRequester)
                 .onFocusChanged {
                     isFocused = it.isFocused
+                    if (!isFocused) newItemName = ""
                 },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = {
                 if (newItemName.isNotBlank()) {
                     onAddItem(newItemName)
                     newItemName = ""
-//                    focusRequester.requestFocus()
+                    focusRequester.requestFocus()
                 }
             }),
             colors = TextFieldDefaults.colors(

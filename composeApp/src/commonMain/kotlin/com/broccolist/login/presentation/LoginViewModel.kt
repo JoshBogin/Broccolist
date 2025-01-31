@@ -1,6 +1,6 @@
 package com.broccolist.login.presentation
 
-import com.broccolist.app.presentation.MPViewModel
+import com.broccolist.core.MPViewModel
 import com.broccolist.core.data.AuthApi
 import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.flow.MutableStateFlow
