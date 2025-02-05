@@ -30,7 +30,9 @@ fun ItemInserter(
     listId: Int,
     sections: List<Section>,
     onItemInserted: (SectionItem) -> Unit,
-    onSectionSelected: (Section) -> Unit // need to use this to check if section exists or not
+    onSectionSelected: (Section) -> Unit, // need to use this to check if section exists or not
+    isItemTextError: Boolean = false,
+    isCustomSectionError: Boolean = false,
 ) {
     var expandedDropdown by remember { mutableStateOf(false) }
     var showCustomTextField by remember { mutableStateOf(false) }
@@ -47,14 +49,17 @@ fun ItemInserter(
             value = itemName,
             onValueChange = {
                 itemName = it
-                onItemInserted(SectionItem(
-                    name = it,
-                    isChecked = false,
-                    sectionId = selectedSection?.id ?: 0,
-                ))
+                onItemInserted(
+                    SectionItem(
+                        name = it,
+                        isChecked = false,
+                        sectionId = selectedSection?.id,
+                    )
+                )
             },
             label = { Text("Item Name") },
-            singleLine = true
+            singleLine = true,
+            isError = isItemTextError,
         )
 
         // Dropdown for predefined sections
@@ -170,6 +175,7 @@ fun ItemInserter(
                 },
                 label = { Text("Section Name") },
                 singleLine = true,
+                isError = isCustomSectionError,
             )
         }
     }

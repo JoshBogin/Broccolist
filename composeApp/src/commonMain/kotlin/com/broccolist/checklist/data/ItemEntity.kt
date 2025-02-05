@@ -10,5 +10,5 @@ data class ItemEntity(
     @SerialName("is_checked")
     val isChecked: Boolean,
     @SerialName("section_id")
-    val sectionId: Int,
+    val sectionId: Int? = null,
 )

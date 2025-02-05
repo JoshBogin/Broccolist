@@ -99,6 +99,7 @@ import broccolist.composeapp.generated.resources.sign_out
 import com.broccolist.checklist.domain.GrocerySection
 import com.broccolist.checklist.domain.Section
 import com.broccolist.checklist.domain.SectionItem
+import com.broccolist.checklist.domain.has
 import com.broccolist.checklist.presentation.components.ItemInserter
 import com.broccolist.checklist.presentation.components.PlaceholderItemRow
 import com.broccolist.checklist.presentation.components.SectionSelector
@@ -426,7 +427,6 @@ fun CheckListScreen(
             ) {
                 items(sections) { section ->
                     ItemSection(
-                        focusRequester = focusRequester,
                         removeSection = removeSection,
                         onUpdateSection = updateSection,
                         addItemToSection = addItemToSection,
@@ -495,6 +495,8 @@ fun CheckListScreen(
             if (showItemInserter) {
                 var item by remember { mutableStateOf<SectionItem?>(null) }
                 var selectedSection by remember { mutableStateOf<Section?>(null) }
+                var isItemTextError by remember { mutableStateOf(false) }
+                var isCustomSectionError by remember { mutableStateOf(false) }
 
                 AlertDialog(
                     onDismissRequest = { showItemInserter = false },
@@ -503,12 +505,30 @@ fun CheckListScreen(
                         ItemInserter(
                             sections = sections,
                             onItemInserted = { newItem ->
-                                item = newItem
+                                if (newItem.name.isBlank()) {
+                                    isItemTextError = true
+                                } else {
+                                    isItemTextError = false
+                                    item = newItem
+                                }
                             },
                             onSectionSelected = { newSection ->
-                                selectedSection = newSection
+                                selectedSection = if (newSection.section is GrocerySection.Custom &&
+                                    newSection.section.displayName.isBlank()
+                                ) {
+                                    isCustomSectionError = true
+                                    null
+                                } else if(sections.has(newSection.section)) {
+                                    isCustomSectionError = false
+                                    sections.first { it.section == newSection.section }
+                                } else {
+                                    isCustomSectionError = false
+                                    newSection
+                                }
                             },
                             listId = listId,
+                            isItemTextError = isItemTextError,
+                            isCustomSectionError = isCustomSectionError,
                         )
                     },
                     confirmButton = {
@@ -541,7 +561,6 @@ fun CheckListScreen(
 
 @Composable
 private fun ItemSection(
-    focusRequester: FocusRequester,
     removeSection: (Section) -> Unit,
     onUpdateSection: (Section) -> Unit,
     addItemToSection: (Section, SectionItem) -> Unit,
@@ -617,7 +636,7 @@ private fun ItemSection(
                         val newItem = SectionItem(
                             name = newItemName,
                             isChecked = false,
-                            sectionId = section.id ?: 0
+                            sectionId = section.id
                         )
                         addItemToSection(section, newItem)
                     },

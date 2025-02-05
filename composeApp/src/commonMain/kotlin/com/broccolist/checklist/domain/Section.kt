@@ -11,3 +11,7 @@ data class Section(
             listId == other.listId
     }
 }
+
+fun List<Section>.has(section: GrocerySection): Boolean {
+    return this.any { it.section == section }
+}

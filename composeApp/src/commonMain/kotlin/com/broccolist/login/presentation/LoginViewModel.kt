@@ -1,6 +1,7 @@
 package com.broccolist.login.presentation
 
-import com.broccolist.core.MPViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.broccolist.core.data.AuthApi
 import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -10,10 +11,10 @@ import kotlinx.coroutines.launch
 
 class LoginViewModel(
     private val authApi: AuthApi,
-) : MPViewModel() {
+) : ViewModel() {
     val composeAuth = authApi.composeAuth()
     val sessionStatus = authApi.sessionStatus().stateIn(
-        scope = coroutineScope,
+        scope = viewModelScope,
         started = SharingStarted.Eagerly,
         initialValue = SessionStatus.NotAuthenticated(false),
     )
@@ -21,7 +22,7 @@ class LoginViewModel(
     val passwordReset = MutableStateFlow<Boolean>(false)
 
     fun signUp(email: String, password: String) {
-        coroutineScope.launch {
+        viewModelScope.launch {
             kotlin.runCatching {
                 authApi.signUp(email, password)
             }.onFailure {
@@ -31,7 +32,7 @@ class LoginViewModel(
     }
 
     fun login(email: String, password: String) {
-        coroutineScope.launch {
+        viewModelScope.launch {
             kotlin.runCatching {
                 authApi.signIn(email, password)
             }.onFailure {
@@ -42,19 +43,19 @@ class LoginViewModel(
     }
 
     fun signInWithGoogle() {
-        coroutineScope.launch {
+        viewModelScope.launch {
             authApi.signInWithGoogle()
         }
     }
 
     fun signInWithApple() {
-        coroutineScope.launch {
+        viewModelScope.launch {
             authApi.signInWithApple()
         }
     }
 
     fun resetPassword(email: String) {
-        coroutineScope.launch {
+        viewModelScope.launch {
             kotlin.runCatching {
                 authApi.resetPassword(email)
             }
@@ -62,7 +63,7 @@ class LoginViewModel(
     }
 
     fun changePassword(password: String) {
-        coroutineScope.launch {
+        viewModelScope.launch {
             kotlin.runCatching {
                 authApi.changePassword(password)
             }.onSuccess {

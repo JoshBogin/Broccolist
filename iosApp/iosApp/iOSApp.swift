@@ -15,14 +15,16 @@ struct iOSApp: App {
             ContentView().onOpenURL { url in
                 print("Received URL: \(url)")
                 
-//                if url.scheme?.hasPrefix("io.supabase") ?? false {
-//                    print("Handling Supabase URL")
-//                    let client = DependencyProvider.shared.provideSupabaseClient()
+                if url.scheme?.hasPrefix("io.supabase") ?? false {
+                    print("Handling Supabase URL")
+                    let client = DependencyProvider.shared.provideSupabaseClient()
+                    let urlReturn = GIDSignIn.sharedInstance.handle(url)
+                    print(urlReturn)
 //                    client.onDeepLink(url: url.absoluteString)
-//                } else {
-//                    print("Handling Google URL")
-//                    GIDSignIn.sharedInstance.handle(url)
-//                }
+                } else {
+                    print("Handling Google URL")
+                    GIDSignIn.sharedInstance.handle(url)
+                }
             }
         }
     }
@@ -46,6 +48,9 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         options: [UIApplication.OpenURLOptionsKey: Any] = [:]
     ) -> Bool {
         print("AppDelegate received URL: \(url)")
+        // Handle other custom URL types.
+//        var client = DependencyProvider.shared.provideSupabaseClient()
+//        client.handleDeeplinks(url)
         return true
     }
 }

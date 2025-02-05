@@ -1,10 +1,12 @@
 package com.broccolist.checklist.presentation
 
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.broccolist.checklist.data.SupabaseRepository
 import com.broccolist.checklist.domain.CheckList
 import com.broccolist.checklist.domain.Section
 import com.broccolist.checklist.domain.SectionItem
-import com.broccolist.core.MPViewModel
+import com.broccolist.checklist.domain.has
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.user.UserSession
@@ -16,12 +18,12 @@ import kotlinx.coroutines.launch
 class CheckListViewModel(
     private val supabaseClient: SupabaseClient,
     private val supabaseRepository: SupabaseRepository
-) : MPViewModel() {
+) : ViewModel() {
     private val _checkLists = MutableStateFlow<CheckList?>(null)
     val checkLists = _checkLists.asStateFlow()
 
     fun getList(userSession: UserSession) {
-        coroutineScope.launch {
+        viewModelScope.launch {
             val userId = userSession.user?.id ?: ""
             _checkLists.value = supabaseRepository.getCheckList(userId)
         }
@@ -31,22 +33,27 @@ class CheckListViewModel(
         upsertLocalSection(section)
 
         // Add the section to the database
-        coroutineScope.launch {
-            val newSection = supabaseRepository.addSection(section)
+        viewModelScope.launch {
+            val newSection = supabaseRepository.addSection(section) ?: return@launch
             upsertLocalSection(newSection)
         }
     }
 
     private fun upsertLocalSection(section: Section) {
         val currentSections = _checkLists.value?.sections?.toMutableList() ?: mutableListOf()
-        // remove the section if it already exists before id is set
+        // check if section already exists with null id
+        var combinedSection = section
         currentSections.find {
             it.checkEqualityWithNullId(section)
-        }?.let {
-            currentSections.remove(it) // TODO might have to do some logic to like combine the items of the
-            // two sections to make sure you don't delete the wrong one
+        }?.let { sectionMatch ->
+            // combine items with the section to be deleted
+            combinedSection = combinedSection.copy(
+                items = combinedSection.items?.plus(sectionMatch.items.orEmpty())
+            )
+            currentSections.remove(sectionMatch)
         }
-        currentSections.add(section)
+        // then add the new section
+        currentSections.add(combinedSection)
         _checkLists.update {
             it?.copy(
                 sections = currentSections
@@ -66,7 +73,7 @@ class CheckListViewModel(
         }
 
         // Remove the section from the database
-        coroutineScope.launch {
+        viewModelScope.launch {
             supabaseRepository.removeSection(section)
         }
     }
@@ -86,44 +93,72 @@ class CheckListViewModel(
         }
 
         // Update the section in the database
-        coroutineScope.launch {
+        viewModelScope.launch {
             supabaseRepository.updateSection(section)
         }
     }
 
     // This function is used to add an item to a section. If the section does not exist, it will be created.
     fun addItemToSection(section: Section, item: SectionItem) {
-        upsertLocalItem(section, item)
+        var newItem = item.copy(sectionId = section.id)
+        val isNewSection = upsertLocalItem(section, newItem)
 
         // Add the item to the database
-        coroutineScope.launch {
-            val newItem = supabaseRepository.addItem(item)
-            upsertLocalItem(section, newItem)
+        viewModelScope.launch {
+            if (isNewSection) { // if the section is new, add the section first
+                val newSection = supabaseRepository.addSection(section) ?: return@launch
+                if (newSection.id == null) return@launch
+                // add the new section to the local list
+                upsertLocalSection(newSection)
+                // set sectionId to be the new section's id
+                newItem = newItem.copy(sectionId = newSection.id)
+                // then, wait for the new item to be returned with its id
+                newItem = supabaseRepository.addItem(newItem) ?: return@launch
+                upsertLocalItem(newSection, newItem)
+            } else { // otherwise, add the item to the existing section
+                // first check if item already exists in database
+                val currentItems = section.id?.let { supabaseRepository.getItems(it) }
+                if (currentItems?.has(newItem) == true) return@launch
+                // then, add the new item to the database
+                newItem = supabaseRepository.addItem(newItem) ?: return@launch
+                upsertLocalItem(section, newItem)
+            }
         }
-
     }
 
     private fun upsertLocalItem(
         section: Section,
         item: SectionItem
-    ) {
+    ): Boolean {
         val currentSections = _checkLists.value?.sections?.toMutableList() ?: mutableListOf()
         val index = currentSections.indexOfFirst { it.id == section.id }
-        if (index != -1) {
+
+        return if (index != -1) {
             val currentItems = currentSections[index].items?.toMutableList() ?: mutableListOf()
             // remove the item if it already exists before id is set
-            currentItems.find {
+            val itemIndex = currentItems.indexOfFirst {
                 it.checkEqualityWithNullId(item)
-            }?.let {
-                currentItems.remove(it)
             }
-            currentItems.add(item)
+
+            if (itemIndex != -1) {
+                val existingItem = currentItems[itemIndex]
+                val itemCopy = if (existingItem.id != null) {
+                    item.copy(id = existingItem.id, isChecked = existingItem.isChecked)
+                } else {
+                    item.copy(isChecked = existingItem.isChecked)
+                }
+                currentItems[itemIndex] = itemCopy
+            } else {
+                currentItems.add(item)
+            }
+
             currentSections[index] = currentSections[index].copy(items = currentItems)
             _checkLists.update {
                 it?.copy(
                     sections = currentSections
                 )
             }
+            false
         } else {
             val newSection = section.copy(items = listOf(item))
             currentSections.add(newSection)
@@ -132,6 +167,7 @@ class CheckListViewModel(
                     sections = currentSections
                 )
             }
+            true
         }
     }
 
@@ -154,7 +190,7 @@ class CheckListViewModel(
         }
 
         // Remove the item from the database
-        coroutineScope.launch {
+        viewModelScope.launch {
             supabaseRepository.removeItem(item)
         }
     }
@@ -179,14 +215,14 @@ class CheckListViewModel(
         }
 
         // Update the item in the database
-        coroutineScope.launch {
+        viewModelScope.launch {
             supabaseRepository.updateItem(item)
         }
     }
 
     fun signOut() {
         try {
-            coroutineScope.launch {
+            viewModelScope.launch {
                 supabaseClient.auth.signOut()
             }
             println("Signed out")

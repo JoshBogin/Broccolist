@@ -27,6 +27,11 @@ kotlin {
             isStatic = true
         }
     }
+
+    compilerOptions {
+        // Common compiler options applied to all Kotlin source sets
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
     
     sourceSets {
         
@@ -71,9 +76,8 @@ kotlin {
             implementation(libs.compose.auth.ui)
         }
 
-        nativeMain.dependencies {
+        iosMain.dependencies {
             implementation(libs.ktor.client.darwin)
-            implementation(libs.kotlinx.coroutines.core)
         }
 
         dependencies {
