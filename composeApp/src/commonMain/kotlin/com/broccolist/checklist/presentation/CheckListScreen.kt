@@ -7,6 +7,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -77,7 +79,6 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -151,9 +152,7 @@ fun CheckListScreen(
     signOut: () -> Unit,
     onLogout: () -> Unit,
 ) {
-    val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
-    val keyboardController = LocalSoftwareKeyboardController.current
     val scrollState = rememberLazyListState()
     val drawerState: DrawerState = rememberDrawerState(DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
@@ -164,13 +163,6 @@ fun CheckListScreen(
     val colorScheme = MaterialTheme.colorScheme
 
     println("CheckListScreen: listId=${listId}, sections=${sections}")
-
-//    LaunchedEffect(scrollState) {
-//        if (scrollState.isScrollInProgress) {
-//            keyboardController?.hide()
-//            focusManager.clearFocus()
-//        }
-//    }
 
     ModalNavigationDrawer(
         drawerContent = {
@@ -445,6 +437,7 @@ fun CheckListScreen(
                         onSwipeStateChange = { id ->
                             currentlySwipedId = id
                         },
+                        scrollState = scrollState,
                     )
                 }
             }
@@ -571,10 +564,14 @@ private fun ItemSection(
     swipeInCooldown: Boolean = false,
     currentlySwipedId: Int? = null,
     onSwipeStateChange: (Int) -> Unit,
+    scrollState: LazyListState,
 ) {
     var showItems by remember { mutableStateOf(true) }
     val colorScheme = MaterialTheme.colorScheme
     val sectionFocusRequester = remember { FocusRequester() }
+    val coroutineScope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val itemHeightPx = with(density) { 56.dp.toPx() }  // Convert dp to pixels
 
     Column(
         modifier = Modifier
@@ -639,6 +636,12 @@ private fun ItemSection(
                             sectionId = section.id
                         )
                         addItemToSection(section, newItem)
+
+                        // Scroll after adding the item
+                        coroutineScope.launch {
+                            // Scroll by the height of one item
+                            scrollState.animateScrollBy(itemHeightPx)
+                        }
                     },
                     color = if ((section.items?.size ?: 0) % 2 == 1) {
                         colorScheme.secondaryContainer
@@ -646,7 +649,6 @@ private fun ItemSection(
                         colorScheme.background
                     }
                 )
-
             }
         }
     }
