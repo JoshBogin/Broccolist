@@ -49,6 +49,7 @@ fun App(
                         CheckListScreenRoute(
                             viewModel = checkListViewModel,
                             userSession = userSession,
+                            navController = navController,
                             onLogout = {
                                 navController.navigate(Route.Login) {
                                     popUpTo(Route.CheckList) { inclusive = true }
