@@ -220,6 +220,52 @@ class CheckListViewModel(
         }
     }
 
+    fun moveItem(item: SectionItem, targetSection: Section, index: Int) {
+        if (item.id == null || targetSection.id == null) {
+            return
+        }
+
+        val currentSections = _checkLists.value?.sections?.toMutableList() ?: mutableListOf()
+        val targetSectionIndex = currentSections.indexOfFirst { it.id == targetSection.id }
+        val itemSectionIndex = currentSections.indexOfFirst { it.id == item.sectionId }
+
+        if (targetSectionIndex == -1 || itemSectionIndex == -1) {
+            return
+        }
+
+        // if indexes are the same, target is same section
+        if (targetSectionIndex == itemSectionIndex) {
+            val currentItems = currentSections[itemSectionIndex].items?.toMutableList() ?: mutableListOf()
+            val itemIndex = currentItems.indexOfFirst { it.id == item.id }
+
+            if (itemIndex != -1) {
+                currentItems.removeAt(itemIndex)
+                currentItems.add(index, item)
+            }
+
+            currentSections[itemSectionIndex] = currentSections[itemSectionIndex].copy(items = currentItems)
+
+        } else { // otherwise need to remove from old section and add to new section
+            val currentSectionItems = currentSections[itemSectionIndex].items?.toMutableList() ?: mutableListOf()
+            val targetSectionItems = currentSections[targetSectionIndex].items?.toMutableList() ?: mutableListOf()
+            val itemIndex = currentSectionItems.indexOfFirst { it.id == item.id }
+
+            if (itemIndex != -1) {
+                currentSectionItems.removeAt(itemIndex)
+                targetSectionItems.add(index, item)
+            }
+
+            currentSections[itemSectionIndex] = currentSections[itemSectionIndex].copy(items = currentSectionItems)
+            currentSections[targetSectionIndex] = currentSections[targetSectionIndex].copy(items = targetSectionItems)
+        }
+
+        _checkLists.update {
+            it?.copy(
+                sections = currentSections
+            )
+        }
+    }
+
     fun signOut() {
         try {
             viewModelScope.launch {

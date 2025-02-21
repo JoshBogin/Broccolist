@@ -6,6 +6,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -59,6 +60,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -116,7 +119,8 @@ fun CheckListScreenRoute(
         removeItemFromSection = viewModel::removeItemFromSection,
         updateItem = viewModel::updateItem,
         signOut = viewModel::signOut,
-        onLogout = onLogout
+        onLogout = onLogout,
+        onMoveItem = viewModel::moveItem,
     )
 }
 
@@ -133,6 +137,7 @@ fun CheckListScreen(
     updateItem: (SectionItem) -> Unit,
     signOut: () -> Unit,
     onLogout: () -> Unit,
+    onMoveItem: (SectionItem, Section, Int) -> Unit = { _, _, _ -> },
 ) {
     val focusManager = LocalFocusManager.current
     val scrollState = rememberScrollState()
@@ -348,7 +353,7 @@ fun CheckListScreen(
                                     defaultElevation = 4.dp,
                                     pressedElevation = 8.dp
                                 ),
-                                shape = RoundedCornerShape(24.dp)
+                                shape = CircleShape
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Add,
@@ -374,7 +379,7 @@ fun CheckListScreen(
                                     defaultElevation = 4.dp,
                                     pressedElevation = 8.dp
                                 ),
-                                shape = RoundedCornerShape(24.dp)
+                                shape = CircleShape
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Add,
@@ -424,13 +429,35 @@ fun CheckListScreen(
                     interactionSource = null,
                 )
         ) { contentPadding ->
+            var columnHeights by remember { mutableStateOf(List(sections.size) { 0f }) }
+
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(
                         state = scrollState,
                     )
-                    .padding(contentPadding),
+                    .padding(contentPadding)
+                    .pointerInput(key1 = scrollState) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = { offset ->
+                                // factor in scroll position to determine which section the drag is in
+                                println("Dragging section: $offset")
+                                val y = offset.y + scrollState.value
+                                val heights = columnHeights
+                                val sectionIndex = heights.indexOfFirst { y < it }
+                                if (sectionIndex != -1) {
+                                    val section = sections[sectionIndex]
+                                    currentlySwipedId = section.id ?: 0
+                                }
+                            },
+                            onDragEnd = {},
+                            onDragCancel = {},
+                            onDrag = { change, dragAmount ->
+//                                change.consume()
+                            },
+                        )
+                    },
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 val lastIndex = sections.size - 1
@@ -456,6 +483,16 @@ fun CheckListScreen(
                         },
                         scrollState = scrollState,
                         isLastSection = index == lastIndex,
+                        onMoveItem = onMoveItem,
+                        modifier = Modifier
+                            .onGloballyPositioned { coordinates ->
+                                if (columnHeights.isEmpty()) return@onGloballyPositioned
+
+                                val height = coordinates.size.height.toFloat()
+                                columnHeights = columnHeights.toMutableList().also {
+                                    it[index] = height
+                                }
+                            },
                     )
                 }
             }

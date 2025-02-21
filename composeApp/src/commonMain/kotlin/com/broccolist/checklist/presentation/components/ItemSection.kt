@@ -18,8 +18,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.broccolist.checklist.domain.Section
 import com.broccolist.checklist.domain.SectionItem
 import kotlinx.coroutines.launch
@@ -38,6 +41,8 @@ internal fun ItemSection(
     onSwipeStateChange: (Int) -> Unit,
     scrollState: ScrollState,
     isLastSection: Boolean,
+    onMoveItem: (SectionItem, Section, Int) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var showItems by remember { mutableStateOf(true) }
     val colorScheme = MaterialTheme.colorScheme
@@ -46,8 +51,19 @@ internal fun ItemSection(
     val density = LocalDensity.current
     val itemHeightPx = with(density) { 56.dp.toPx() }  // Convert dp to pixels
 
+    // TODO will need to further hoist these up to the parent
+      // that way drags can be tracked across sections and the z-index can be set when a
+      // section item is being dragged
+    // State for drag and drop
+    var isDragging by remember { mutableStateOf(false) }
+    var draggedItem by remember { mutableStateOf<SectionItem?>(null) }
+    var draggedItemStartPosition by remember { mutableStateOf<Offset?>(null) }
+    var dragOffset by remember { mutableStateOf(Offset.Zero) }
+    var currentDropSection by remember { mutableStateOf<Section?>(null) }
+    var dropIndex by remember { mutableStateOf<Int?>(null) }
+
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -96,6 +112,40 @@ internal fun ItemSection(
                         swipeInCooldown = swipeInCooldown,
                         isCurrentlyBeingSwiped = currentlySwipedId == sectionItem.id,
                         onSwipeStateChange = onSwipeStateChange,
+                        isDragging = isDragging && draggedItem == sectionItem,
+                        onDragStart = { offset ->
+                            isDragging = true
+                            draggedItem = sectionItem
+                            draggedItemStartPosition = offset
+                            currentDropSection = section
+                        },
+                        onDrag = { offset ->
+                            // Calculate potential drop position
+                            dragOffset += offset
+                            val newIndex = calculateDropIndex(dragOffset, section.items)
+                            println("New Index: $newIndex")
+                            dropIndex = newIndex
+                        },
+                        onDragEnd = {
+                            if (dropIndex != null && currentDropSection != null) {
+                                    onMoveItem(sectionItem, currentDropSection ?: section, dropIndex ?: index)
+                            }
+                            isDragging = false
+                            draggedItem = null
+                            draggedItemStartPosition = null
+                            currentDropSection = null
+                            dropIndex = null
+                            dragOffset = Offset.Zero
+                        },
+                        modifier = if (isDragging && draggedItem == sectionItem) {
+                            Modifier
+                                .zIndex(1f)
+                                .graphicsLayer {
+                                    translationY = dragOffset.y
+                                }
+                        } else {
+                            Modifier
+                        }
                     )
                 }
 
@@ -129,4 +179,12 @@ internal fun ItemSection(
             }
         }
     }
+}
+
+private fun calculateDropIndex(offset: Offset, items: List<SectionItem>): Int {
+    // Calculate the index based on the Y position
+    val itemHeight = 56.dp
+    val index = (offset.y / itemHeight.value).toInt()
+//    println("New Index: $index")
+    return index.coerceIn(0, items.size)
 }

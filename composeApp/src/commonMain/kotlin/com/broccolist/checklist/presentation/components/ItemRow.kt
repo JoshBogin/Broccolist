@@ -1,11 +1,9 @@
 package com.broccolist.checklist.presentation.components
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.draganddrop.dragAndDropSource
 import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
@@ -35,8 +33,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -49,7 +50,6 @@ import com.broccolist.checklist.domain.SectionItem
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun ItemRow(
     item: SectionItem,
@@ -60,6 +60,11 @@ internal fun ItemRow(
     swipeInCooldown: Boolean = false,
     isCurrentlyBeingSwiped: Boolean,
     onSwipeStateChange: (Int) -> Unit,
+    isDragging: Boolean = false,
+    onDragStart: (Offset) -> Unit = {},
+    onDrag: (Offset) -> Unit = {},
+    onDragEnd: () -> Unit = {},
+    modifier: Modifier = Modifier
 ) {
     val focusManager = LocalFocusManager.current
     val density = LocalDensity.current
@@ -81,21 +86,32 @@ internal fun ItemRow(
 
     Box(
         contentAlignment = Alignment.Center,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(56.dp)
-            .dragAndDropSource(
-                drawDragDecoration = { } // TODO add drag decoration
-            ) {
-                detectTapGestures(
-                    onLongPress = {
-                        focusManager.clearFocus()
-                        onSwipeStateChange(item.id ?: 0) // maybe use this as a common function to
-                        // ensure only one item is swiped or dragged at a time
-                        offsetX = showOptionsThreshold
+            .pointerInput(Unit) {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = { offset ->
+                        onDragStart(offset)
+                    },
+                    onDrag = { change, dragAmount ->
+                        onDrag(dragAmount)
+                        change.consume()
+//                        println("${item.name} dragAmount: $dragAmount")
+                    },
+                    onDragEnd = {
+                        onDragEnd()
+                    },
+                    onDragCancel = {
+                        onDragEnd()
                     }
                 )
             }
+            .graphicsLayer(
+                scaleX = if (isDragging) 1.03f else 1f,
+                scaleY = if (isDragging) 1.05f else 1f,
+                shadowElevation = if (isDragging) 8f else 0f,
+            )
     ) {
         // Background layer
         Box(
