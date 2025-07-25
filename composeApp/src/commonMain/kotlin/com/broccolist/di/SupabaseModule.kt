@@ -17,8 +17,8 @@ expect fun AuthConfig.platformAuthConfig()
 val supabaseModule = module {
     single {
         createSupabaseClient(
-            supabaseUrl = "https://hyditkiqwwjopzzzqllm.supabase.co",
-            supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5ZGl0a2lxd3dqb3B6enpxbGxtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY4MDIwNzUsImV4cCI6MjA1MjM3ODA3NX0.WU83Gqtdb7kNlRO6qoX3slTcm6I57qMKDSeHzOVtfP8"
+            supabaseUrl = "https://sraqwtqvadmfzmypjgfn.supabase.co",
+            supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNyYXF3dHF2YWRtZnpteXBqZ2ZuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MzQxMjc1MSwiZXhwIjoyMDY4OTg4NzUxfQ.ro_Xwr5bGYRfNgDGol_bG9Cj7UmJB9nRUCVWbh6V0lg"
         ) {
             install(Auth) {
                 platformAuthConfig()
