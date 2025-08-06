@@ -15,11 +15,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: set up JDK 17
+      - name: set up JDK 11
         uses: actions/setup-java@v3
         with:
-          java-version: '17'
-          distribution: 'temurin'
+          java-version: '11'
+          distribution: 'zulu'
           cache: gradle
 
       - name: Increment version of project
@@ -32,15 +32,6 @@ jobs:
       - name: Build Release AAB
         id: buildRelease
         run: ./gradlew bundleRelease
-
-      - if: ${{ env.signing_key != '' }}
-        run: echo 'Check 1'
-      - if: ${{ env.alias != '' }}
-        run: echo 'Check 2'
-      - if: ${{ env.store_pass != '' }}
-        run: echo 'Check 3'
-      - if: ${{ env.key_pass != '' }}
-        run: echo 'Check 4'
 
       - name: Sign AAB
         id: sign_app
