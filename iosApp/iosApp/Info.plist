@@ -28,7 +28,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>io.supabase.broccolist</string>
-                <string>com.googleusercontent.apps.299296791038-hi3i5rcti7g827hv1on3ckl5pjov4lrq</string>
+				<string>com.googleusercontent.apps.299296791038-hi3i5rcti7g827hv1on3ckl5pjov4lrq</string>
 			</array>
 		</dict>
 	</array>

@@ -51,16 +51,13 @@ import androidx.compose.ui.text.style.TextDecoration.Companion.Underline
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.broccolist.login.presentation.components.BroccolistHeader
-import com.broccolist.login.presentation.components.OTPDialogState
 import com.broccolist.login.presentation.components.PasswordRecoveryDialog
 import io.github.jan.supabase.annotations.SupabaseInternal
-import io.github.jan.supabase.auth.providers.Apple
 import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.compose.auth.ComposeAuth
 import io.github.jan.supabase.compose.auth.composable.NativeSignInResult
 import io.github.jan.supabase.compose.auth.composable.NativeSignInState
-import io.github.jan.supabase.compose.auth.composable.rememberSignInWithApple
 import io.github.jan.supabase.compose.auth.composable.rememberSignInWithGoogle
 import io.github.jan.supabase.compose.auth.ui.ProviderIcon
 import io.github.jan.supabase.compose.auth.ui.annotations.AuthUiExperimental
@@ -79,7 +76,7 @@ fun LoginScreenRoute(
         signIn = viewModel::login,
         signUp = viewModel::signUp,
         signInWithGoogle = viewModel::signInWithGoogle,
-        signInWithApple = viewModel::signInWithApple,
+        continueAsGuest = viewModel::continueAsGuest,
         resetPassword = viewModel::resetPassword,
         loginAlert = viewModel.alert.collectAsState().value,
         resetAlert = viewModel::resetAlert,
@@ -95,18 +92,16 @@ fun LoginScreen(
     signIn: (String, String) -> Unit,
     signUp: (String, String) -> Unit,
     signInWithGoogle: () -> Unit,
-    signInWithApple: () -> Unit,
+    continueAsGuest: () -> Unit,
     resetPassword: (String) -> Unit,
     loginAlert: String?,
     resetAlert: () -> Unit,
 ) {
     val googleSignIn = googleSignIn(supabaseAuth, signInWithGoogle)
-    val appleSignIn = appleSignIn(supabaseAuth, signInWithApple)
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
     var isSignUp by remember { mutableStateOf(false) }
     var email by remember { mutableStateOf("") }
-    var otpDialogState by remember { mutableStateOf<OTPDialogState>(OTPDialogState.Invisible) }
     var showPasswordRecoveryDialog by remember { mutableStateOf(false) }
     var password by remember { mutableStateOf("") }
 
@@ -250,11 +245,13 @@ fun LoginScreen(
                 )
             }
 
+            // Apple sign-in is intentionally hidden until an Apple developer
+            // account is provisioned (see project_docs/PRD.md §4.1).
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 32.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.Center,
             ) {
                 OutlinedButton(
                     colors = ButtonDefaults.buttonColors(
@@ -267,7 +264,7 @@ fun LoginScreen(
                     },
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier
-                        .weight(1f)
+                        .fillMaxWidth()
                         .padding(vertical = 8.dp)
                 ) {
                     ProviderIcon(
@@ -275,27 +272,19 @@ fun LoginScreen(
                         contentDescription = "Google",
                         modifier = Modifier.size(32.dp),
                     )
+                    Spacer(Modifier.size(12.dp))
+                    Text("Continue with Google")
                 }
-                OutlinedButton(
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = colorScheme.background,
-                        contentColor = colorScheme.primary,
-                    ),
-                    border = BorderStroke(1.dp, colorScheme.primary),
-                    onClick = {
-                        appleSignIn.startFlow()
-                    },
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(vertical = 8.dp)
-                ) {
-                    ProviderIcon(
-                        provider = Apple,
-                        contentDescription = "Apple",
-                        modifier = Modifier.size(32.dp),
-                    )
-                }
+            }
+
+            TextButton(
+                onClick = {
+                    continueAsGuest()
+                    onLoginSuccess()
+                },
+                modifier = Modifier.padding(top = 8.dp),
+            ) {
+                Text("Continue as Guest")
             }
         }
 
@@ -320,11 +309,9 @@ fun LoginScreen(
             onDismiss = { showPasswordRecoveryDialog = false },
             onConfirm = { resetEmail ->
                 resetPassword(resetEmail)
-                otpDialogState = OTPDialogState.Visible(
-                    title = "Password recovery",
-                    email = resetEmail,
-                    resetFlow = true
-                )
+                // Supabase sends a magic link by email; the user completes the
+                // reset by tapping it. We surface a confirmation via the
+                // existing `loginAlert` channel from the ViewModel.
             }
         )
     }
@@ -376,39 +363,6 @@ private fun googleSignIn(
         fallback = {
             println("Using fallback")
             signInWithGoogle()
-        }
-    )
-    return action
-}
-
-@Composable
-private fun appleSignIn( // TODO still need to setup apple oauth in supabase,
-    //   but this is blocked by apple dev account
-    supabaseAuth: ComposeAuth,
-    signInWithApple: () -> Unit,
-): NativeSignInState {
-    val action = supabaseAuth.rememberSignInWithApple(
-        onResult = { result ->
-            when (result) {
-                is NativeSignInResult.Success -> {
-                    println("Logged in successfully!")
-                }
-
-                NativeSignInResult.ClosedByUser -> {
-                    println("User closed the login dialog")
-                }
-
-                is NativeSignInResult.Error -> {
-                    println("Error logging in: ${result.message}")
-                }
-
-                is NativeSignInResult.NetworkError -> {
-                    println("Network error logging in: ${result.message}")
-                }
-            }
-        },
-        fallback = {
-            signInWithApple()
         }
     )
     return action

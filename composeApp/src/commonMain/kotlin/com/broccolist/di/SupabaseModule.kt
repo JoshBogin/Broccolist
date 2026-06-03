@@ -22,7 +22,15 @@ val supabaseModule = module {
         ) {
             install(Auth) {
                 platformAuthConfig()
-                flowType = FlowType.PKCE
+                // IMPLICIT instead of PKCE: on iOS in supabase-kt 3.0.3 the
+                // OAuth flow opens external Safari, which can background and
+                // kill the app long enough to lose the PKCE code verifier
+                // kept in memory. Implicit flow returns tokens directly in
+                // the redirect URL fragment, no second-leg exchange needed,
+                // so the round-trip survives an app restart. Revisit when
+                // upgrading supabase-kt to 3.1+ (which adds in-app
+                // ASWebAuthenticationSession support on iOS).
+                flowType = FlowType.IMPLICIT
             }
             install(ComposeAuth) {
                 googleNativeLogin("299296791038-in8oqrmivn8f7a096lgn7if70v32qsth.apps.googleusercontent.com") // Web Client ID

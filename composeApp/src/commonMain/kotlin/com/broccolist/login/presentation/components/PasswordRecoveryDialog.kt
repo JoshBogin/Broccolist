@@ -21,16 +21,16 @@ fun PasswordRecoveryDialog(
     var email by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Password recovery") },
+        title = { Text("Reset your password") },
         text = {
             Column {
-                Text("Please enter your new password.")
+                Text("Enter the email associated with your account. We'll send you a link to reset your password.")
                 OutlinedTextField(
                     value = email,
                     onValueChange = { email = it },
                     label = { Text("Email") },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
                 )
             }
         },
@@ -42,12 +42,12 @@ fun PasswordRecoveryDialog(
                 },
                 enabled = email.isNotBlank()
             ) {
-                Text("Confirm")
+                Text("Send link")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Dismiss")
+                Text("Cancel")
             }
         }
     )

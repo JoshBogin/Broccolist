@@ -7,6 +7,7 @@ import com.broccolist.checklist.domain.CheckList
 import com.broccolist.checklist.domain.Section
 import com.broccolist.checklist.domain.SectionItem
 import com.broccolist.checklist.domain.has
+import com.broccolist.core.data.GuestModeRepository
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.user.UserSession
@@ -17,12 +18,34 @@ import kotlinx.coroutines.launch
 
 class CheckListViewModel(
     private val supabaseClient: SupabaseClient,
-    private val supabaseRepository: SupabaseRepository
+    private val supabaseRepository: SupabaseRepository,
+    private val guestModeRepository: GuestModeRepository,
 ) : ViewModel() {
     private val _checkLists = MutableStateFlow<CheckList?>(null)
     val checkLists = _checkLists.asStateFlow()
 
-    fun getList(userSession: UserSession) {
+    /** True when the current data set is local-only (guest mode). */
+    private val isGuest: Boolean get() = guestModeRepository.isGuest.value
+
+    /**
+     * Load the user's list. Pass `null` for guest mode — we hand back an
+     * empty in-memory list. Phase 3 will replace this with SQLDelight-backed
+     * storage and an explicit migration step when the guest upgrades.
+     */
+    fun getList(userSession: UserSession?) {
+        if (userSession == null || isGuest) {
+            // In-memory only for guests. Seed with an empty list so the UI has
+            // something to render.
+            if (_checkLists.value == null) {
+                _checkLists.value = CheckList(
+                    id = GUEST_LIST_ID,
+                    name = "My List",
+                    sections = emptyList(),
+                    userId = GUEST_USER_ID,
+                )
+            }
+            return
+        }
         viewModelScope.launch {
             val userId = userSession.user?.id ?: ""
             _checkLists.value = supabaseRepository.getCheckList(userId)
@@ -30,9 +53,16 @@ class CheckListViewModel(
     }
 
     fun addSection(section: Section) {
-        upsertLocalSection(section)
+        // Optimistic local update covers both guest and signed-in users.
+        // Guests never sync; signed-in users still get the DB write below.
+        val localSection = if (isGuest && section.id == null) {
+            section.copy(id = nextLocalId())
+        } else {
+            section
+        }
+        upsertLocalSection(localSection)
+        if (isGuest) return
 
-        // Add the section to the database
         viewModelScope.launch {
             val newSection = supabaseRepository.addSection(section) ?: return@launch
             upsertLocalSection(newSection)
@@ -71,6 +101,7 @@ class CheckListViewModel(
                 sections = currentSections
             )
         }
+        if (isGuest) return
 
         // Remove the section from the database
         viewModelScope.launch {
@@ -91,6 +122,7 @@ class CheckListViewModel(
                 )
             }
         }
+        if (isGuest) return
 
         // Update the section in the database
         viewModelScope.launch {
@@ -100,6 +132,18 @@ class CheckListViewModel(
 
     // This function is used to add an item to a section. If the section does not exist, it will be created.
     fun addItemToSection(section: Section, item: SectionItem) {
+        if (isGuest) {
+            // Guest path: assign a local id, ensure the section exists locally,
+            // and insert the item. No network round-trip.
+            val resolvedSection = section.id?.let { section } ?: section.copy(id = nextLocalId())
+            val localItem = item.copy(
+                id = nextLocalId(),
+                sectionId = resolvedSection.id,
+            )
+            upsertLocalItem(resolvedSection, localItem)
+            return
+        }
+
         var newItem = item.copy(sectionId = section.id)
         val isNewSection = upsertLocalItem(section, newItem)
 
@@ -188,6 +232,7 @@ class CheckListViewModel(
                 )
             }
         }
+        if (isGuest) return
 
         // Remove the item from the database
         viewModelScope.launch {
@@ -213,6 +258,7 @@ class CheckListViewModel(
                 }
             }
         }
+        if (isGuest) return
 
         // Update the item in the database
         viewModelScope.launch {
@@ -221,6 +267,14 @@ class CheckListViewModel(
     }
 
     fun signOut() {
+        // Drop any in-memory guest data when leaving the session. Phase 3 will
+        // also clear the local SQLDelight DB (or migrate it to the account
+        // the user is signing into, depending on flow).
+        if (isGuest) {
+            guestModeRepository.exitGuestMode()
+            _checkLists.value = null
+            return
+        }
         try {
             viewModelScope.launch {
                 supabaseClient.auth.signOut()
@@ -229,5 +283,19 @@ class CheckListViewModel(
         } catch (e: Exception) {
             println("Error during sign out: $e")
         }
+    }
+
+    /**
+     * Hand-rolled local ID generator for guest-mode sections and items. Uses
+     * negative numbers so they're easy to distinguish from server-assigned
+     * positive IDs if/when we migrate. Will be replaced by SQLDelight
+     * auto-increment in Phase 3.
+     */
+    private var localIdCounter: Int = -1
+    private fun nextLocalId(): Int = localIdCounter--
+
+    private companion object {
+        const val GUEST_USER_ID = "guest"
+        const val GUEST_LIST_ID = -1
     }
 }

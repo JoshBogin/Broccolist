@@ -23,7 +23,7 @@ import org.koin.compose.viewmodel.koinViewModel
 fun App(
     viewModel: AppViewModel = koinViewModel()
 ) {
-    val sessionStatus by viewModel.sessionStatus.collectAsState()
+    val authState by viewModel.authState.collectAsState()
 
     BroccolistTheme(
         darkTheme = isSystemInDarkTheme()
@@ -41,7 +41,7 @@ fun App(
                     popEnterTransition = { slideInHorizontally() }
                 ) {
                     AuthenticatedContent(
-                        sessionStatus = sessionStatus,
+                        authState = authState,
                         navController = navController
                     ) { userSession ->
                         val checkListViewModel = koinViewModel<CheckListViewModel>()
@@ -51,6 +51,7 @@ fun App(
                             userSession = userSession,
                             navController = navController,
                             onLogout = {
+                                viewModel.exitGuestMode()
                                 navController.navigate(Route.Login) {
                                     popUpTo(Route.CheckList) { inclusive = true }
                                 }

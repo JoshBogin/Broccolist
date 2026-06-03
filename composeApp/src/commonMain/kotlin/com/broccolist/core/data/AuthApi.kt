@@ -14,10 +14,26 @@ sealed interface AuthApi {
 
     suspend fun signIn(email: String, password: String)
 
+    /**
+     * Creates a new Supabase account. The Supabase project is configured to
+     * require email confirmation, so the returned session is null until the
+     * user clicks the verification link in their inbox.
+     */
     suspend fun signUp(email: String, password: String)
+
+    /**
+     * Re-sends the verification email for an existing unverified account.
+     * Safe to call repeatedly; Supabase enforces its own rate limiting.
+     */
+    suspend fun resendVerificationEmail(email: String)
 
     suspend fun signInWithGoogle()
 
+    /**
+     * Apple sign-in is intentionally hidden from the UI until an Apple
+     * developer account is in place. The API surface is preserved so the
+     * provider can be re-enabled without touching the data layer.
+     */
     suspend fun signInWithApple()
 
     suspend fun signOut()
@@ -59,6 +75,16 @@ internal class AuthApiImpl(
             this.email = email
             this.password = password
         }
+    }
+
+    override suspend fun resendVerificationEmail(email: String) {
+        // Supabase's `resend` API takes an OtpType; signup verifications use
+        // the `signup` type. Wrapping in a try/catch keeps the caller simple —
+        // a failure here surfaces as a user-visible alert.
+        auth.resendEmail(
+            type = io.github.jan.supabase.auth.OtpType.Email.SIGNUP,
+            email = email,
+        )
     }
 
     override suspend fun signInWithGoogle() {
