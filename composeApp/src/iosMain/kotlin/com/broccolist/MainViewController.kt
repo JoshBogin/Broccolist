@@ -32,12 +32,22 @@ fun MainViewController(
 
 /**
  * Forwards a deep-link URL into Supabase's auth handler. Called from Swift's
- * AppDelegate `application(_:open:)` for warm-path deep links (OAuth callback,
- * email verification, password reset). Cold-launch URLs are also routed
- * through here via [MainViewController].
+ * `ContentView.onOpenURL` for every inbound URL (OAuth callback, email
+ * verification, password reset). The SwiftUI `App` lifecycle uses scene-based
+ * URL routing, so `AppDelegate.application(_:open:)` is never invoked under
+ * this setup — `.onOpenURL` is the single entry point. Cold-launch URLs
+ * also flow through here via [MainViewController].
+ *
+ * Defensive Koin guard: if `.onOpenURL` fires before [MainViewController]'s
+ * `configure` block runs (race on cold launch), `DependencyProvider` would
+ * fail. Starting Koin here keeps the call site safe in either order.
  */
 fun handleSupabaseDeeplink(url: NSURL) {
     println("handleSupabaseDeeplink: $url")
+    if (!koinStarted) {
+        initKoin()
+        koinStarted = true
+    }
     val client = DependencyProvider.provideSupabaseClient()
     client.handleDeeplinks(url)
 }

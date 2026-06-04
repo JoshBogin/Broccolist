@@ -25,6 +25,22 @@ Code-level changes landed:
 - Persisting guest data across app restarts (currently in-memory only).
 - Migrating guest data to a real account on sign-up / sign-in.
 
+### Phase 0 follow-up: code-review fixes (this session)
+
+Copilot reviewed the Phase 0 PR and flagged five issues. Status:
+
+- **Security: service_role key rotated.** The Supabase key embedded in `SupabaseModule.kt` was decoded as a `service_role` JWT (admin, bypasses RLS). Rotated in the Supabase dashboard and replaced with the new **publishable key** (`sb_publishable_...` format — the successor to legacy `anon`). Anything that was relying on service-role bypass is now subject to RLS.
+- **Auto-clear guest mode on sign-in.** `AppViewModel.init` now observes `authApi.sessionStatus()` and calls `guestModeRepository.exitGuestMode()` when an `Authenticated` session arrives. Without this, `CheckListViewModel.isGuest` stayed `true` after a guest signed in and silently dropped all Supabase writes.
+- **`FlowType` is now platform-specific.** Removed from the shared `install(Auth)` block. `SupabaseModule.android.kt` pins `FlowType.PKCE` (Custom Tabs keeps the app foregrounded; the in-memory verifier survives). `SupabaseModule.ios.kt` pins `FlowType.IMPLICIT` (external Safari may kill the app and lose the verifier; tokens-in-fragment side-steps the issue). Re-evaluate when supabase-kt 3.1+ brings `ASWebAuthenticationSession` to iOS.
+- **`handleSupabaseDeeplink` is now Koin-safe.** Guards `initKoin()` with the same `koinStarted` flag `MainViewController` uses, so a deep link arriving before the first `configure` block runs won't crash `DependencyProvider`. KDoc rewritten to reflect that SwiftUI's `.onOpenURL` (not `AppDelegate.application(_:open:)`) is the actual entry point under the SwiftUI `App` lifecycle.
+- **Skipped: hardcoded `DEVELOPMENT_TEAM` in `project.pbxproj`.** Valid concern for multi-contributor / CI setups, irrelevant for a solo personal project today. Revisit if collaborators or CI are added.
+
+### Open work from this round
+
+- **RLS policies.** Now that the client uses the publishable key, every read and write is subject to Row Level Security. The `lists`, `sections`, and `items` tables need policies that restrict access to `auth.uid() = user_id` (and, in Phase 4, to members listed in `list_members`). Without policies, all reads and writes will be denied.
+- **Reset-password screen.** `AuthApi.changePassword` exists but no `Route.ResetPassword` UI is wired to the recovery deep link. Build this before users actually exercise the reset flow.
+- **Upgrade supabase-kt to 3.1+.** Unblocks `ExternalAuthAction.WebAuthenticationSession` on iOS, lets us return to PKCE on iOS, and removes the "Open in Broccolist?" prompt.
+
 
 ## 1. Vision
 

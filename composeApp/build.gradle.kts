@@ -66,6 +66,7 @@ kotlin {
             implementation(libs.bundles.ktor)
 
             implementation(libs.androidx.credentials)
+            implementation(libs.androidx.credentials.play.services.auth)
             implementation(libs.googleid)
 
             implementation(project.dependencies.platform(libs.supabase.bom))
