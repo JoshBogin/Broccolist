@@ -51,7 +51,6 @@ import androidx.compose.ui.text.style.TextDecoration.Companion.Underline
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.broccolist.login.presentation.components.BroccolistHeader
-import com.broccolist.login.presentation.components.PasswordRecoveryDialog
 import io.github.jan.supabase.annotations.SupabaseInternal
 import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.status.SessionStatus
@@ -67,7 +66,8 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun LoginScreenRoute(
     viewModel: LoginViewModel = koinViewModel(),
-    onLoginSuccess: () -> Unit
+    onLoginSuccess: () -> Unit,
+    onForgotPassword: () -> Unit,
 ) {
     LoginScreen(
         onLoginSuccess = onLoginSuccess,
@@ -77,7 +77,7 @@ fun LoginScreenRoute(
         signUp = viewModel::signUp,
         signInWithGoogle = viewModel::signInWithGoogle,
         continueAsGuest = viewModel::continueAsGuest,
-        resetPassword = viewModel::resetPassword,
+        onForgotPassword = onForgotPassword,
         loginAlert = viewModel.alert.collectAsState().value,
         resetAlert = viewModel::resetAlert,
     )
@@ -93,7 +93,7 @@ fun LoginScreen(
     signUp: (String, String) -> Unit,
     signInWithGoogle: () -> Unit,
     continueAsGuest: () -> Unit,
-    resetPassword: (String) -> Unit,
+    onForgotPassword: () -> Unit,
     loginAlert: String?,
     resetAlert: () -> Unit,
 ) {
@@ -102,7 +102,6 @@ fun LoginScreen(
     val focusManager = LocalFocusManager.current
     var isSignUp by remember { mutableStateOf(false) }
     var email by remember { mutableStateOf("") }
-    var showPasswordRecoveryDialog by remember { mutableStateOf(false) }
     var password by remember { mutableStateOf("") }
 
     LaunchedEffect(sessionStatus) {
@@ -191,7 +190,7 @@ fun LoginScreen(
 
                 if (!isSignUp) {
                     TextButton(
-                        onClick = { showPasswordRecoveryDialog = true },
+                        onClick = onForgotPassword,
                         contentPadding = ButtonDefaults.TextButtonContentPadding,
                         shape = ButtonDefaults.textShape,
                         interactionSource = null,
@@ -302,18 +301,6 @@ fun LoginScreen(
             }
             Text(annotatedString)
         }
-    }
-
-    if (showPasswordRecoveryDialog) {
-        PasswordRecoveryDialog(
-            onDismiss = { showPasswordRecoveryDialog = false },
-            onConfirm = { resetEmail ->
-                resetPassword(resetEmail)
-                // Supabase sends a magic link by email; the user completes the
-                // reset by tapping it. We surface a confirmation via the
-                // existing `loginAlert` channel from the ViewModel.
-            }
-        )
     }
 
     if (loginAlert != null) {

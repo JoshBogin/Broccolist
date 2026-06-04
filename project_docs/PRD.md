@@ -37,9 +37,13 @@ Copilot reviewed the Phase 0 PR and flagged five issues. Status:
 
 ### Open work from this round
 
-- **RLS policies.** Now that the client uses the publishable key, every read and write is subject to Row Level Security. The `lists`, `sections`, and `items` tables need policies that restrict access to `auth.uid() = user_id` (and, in Phase 4, to members listed in `list_members`). Without policies, all reads and writes will be denied.
-- **Reset-password screen.** `AuthApi.changePassword` exists but no `Route.ResetPassword` UI is wired to the recovery deep link. Build this before users actually exercise the reset flow.
-- **Upgrade supabase-kt to 3.1+.** Unblocks `ExternalAuthAction.WebAuthenticationSession` on iOS, lets us return to PKCE on iOS, and removes the "Open in Broccolist?" prompt.
+- **RLS policies — DONE.** Per-user policies applied to `lists`, `sections`, and `items` via the parent-`user_id` traversal. Verified end-to-end with sign-in / CRUD on both platforms.
+- **Reset-password flow — DONE.** Four-screen flow built per the designs: `ResetPasswordRequest` → `ResetPasswordSent(email)` → `ResetPasswordCreate` → `ResetPasswordSuccess`. Replaces the old `PasswordRecoveryDialog`. The user manually advances from the "Check your email" screen via "I've got the link — continue" after tapping the recovery link in their inbox (which silently creates a recovery session via `handleSupabaseDeeplink`). `ResetPasswordCreate` enforces three live rules: ≥8 characters, mixed case, ≥1 digit — and a matching-confirm-field check before submission is enabled. Rules live in a `PasswordRules` data class that's pure Kotlin (testable without Compose).
+- **Upgrade supabase-kt to 3.1+** (still pending). Unblocks `ExternalAuthAction.WebAuthenticationSession` on iOS, lets us return to PKCE on iOS, and removes the "Open in Broccolist?" prompt.
+
+### Phase 0 status: complete
+
+Auth surface is functionally green on both platforms: email/password with verification + reset, Google sign-in (Android Credential Manager + iOS OAuth web fallback), guest mode with auto-clear on sign-in, Apple hidden until dev account is available, publishable key with RLS-enforced data access. Ready to move into Phase 1 (Dashboard + multi-list + inline rename).
 
 
 ## 1. Vision
