@@ -7,7 +7,9 @@ import androidx.compose.runtime.Composable
 object BroccolistTheme {
     private val LightColors = lightColorScheme(
         primary = BroccolistColors.PrimaryGreen,
-        primaryContainer = BroccolistColors.White,
+        // primaryContainer is the light-green surface used by disabled
+        // buttons, icon badges, and the top app bar.
+        primaryContainer = BroccolistColors.SelectionGreen,
         secondary = BroccolistColors.CheckGreen,
         secondaryContainer = BroccolistColors.LightGray,
         tertiary = BroccolistColors.SelectionGreen,
@@ -22,11 +24,13 @@ object BroccolistTheme {
         onTertiaryContainer = BroccolistColors.Black,
     )
 
-    // You can also define dark colors if you want to support dark mode
     private val DarkColors = darkColorScheme(
-        primary = BroccolistColors.LightGreen,
-        primaryContainer = BroccolistColors.Black,
-        secondary = BroccolistColors.LightGreen,
+        // Bright-but-light green for the active accent
+        primary = BroccolistColors.PrimaryGreenLight,
+        // Muted darker green for disabled buttons and icon badges — has
+        // enough chroma against black to read as "available but inactive".
+        primaryContainer = BroccolistColors.PrimaryGreenDark,
+        secondary = BroccolistColors.PrimaryGreenLight,
         secondaryContainer = BroccolistColors.DarkGray,
         tertiary = BroccolistColors.SelectionGreenDark,
         background = BroccolistColors.Black,

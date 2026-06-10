@@ -36,7 +36,7 @@ class MainActivity : ComponentActivity() {
                 // Handle system bars
                 DisposableEffect(systemUiController, darkTheme) {
                     systemUiController.setStatusBarColor(
-                        color = colorScheme.primaryContainer,
+                        color = colorScheme.surface,
                         darkIcons = !darkTheme
                     )
                     systemUiController.setNavigationBarColor(

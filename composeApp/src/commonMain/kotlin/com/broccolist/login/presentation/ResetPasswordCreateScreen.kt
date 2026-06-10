@@ -167,11 +167,13 @@ fun ResetPasswordCreateScreen(
             onClick = { onUpdatePassword(password) },
             enabled = canSubmit,
             shape = RoundedCornerShape(28.dp),
+            // Same pattern as the Login button: dark green active, light
+            // green (primaryContainer) disabled. See LoginScreen.kt.
             colors = ButtonDefaults.buttonColors(
-                containerColor = colorScheme.primaryContainer,
-                contentColor = colorScheme.primary,
-                disabledContainerColor = colorScheme.primaryContainer.copy(alpha = 0.5f),
-                disabledContentColor = colorScheme.primary.copy(alpha = 0.5f),
+                containerColor = colorScheme.primary,
+                contentColor = colorScheme.onPrimary,
+                disabledContainerColor = colorScheme.primaryContainer,
+                disabledContentColor = colorScheme.primary,
             ),
             modifier = Modifier
                 .fillMaxWidth()

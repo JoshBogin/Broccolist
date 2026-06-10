@@ -115,11 +115,14 @@ fun ResetPasswordRequestScreen(
             onClick = { onSendResetLink(email.trim()) },
             enabled = email.isNotBlank(),
             shape = RoundedCornerShape(28.dp),
+            // Matches the Login button pattern: dark green when active,
+            // light green (primaryContainer) when disabled. Keeps every
+            // "needs user input first" CTA consistent across the app.
             colors = ButtonDefaults.buttonColors(
-                containerColor = colorScheme.primaryContainer,
-                contentColor = colorScheme.primary,
-                disabledContainerColor = colorScheme.primaryContainer.copy(alpha = 0.5f),
-                disabledContentColor = colorScheme.primary.copy(alpha = 0.5f),
+                containerColor = colorScheme.primary,
+                contentColor = colorScheme.onPrimary,
+                disabledContainerColor = colorScheme.primaryContainer,
+                disabledContentColor = colorScheme.primary,
             ),
             modifier = Modifier
                 .fillMaxWidth()

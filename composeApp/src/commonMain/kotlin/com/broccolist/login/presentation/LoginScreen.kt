@@ -23,7 +23,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.OutlinedButton
@@ -45,11 +44,13 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration.Companion.Underline
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.broccolist.login.presentation.components.BroccolistHeader
 import io.github.jan.supabase.annotations.SupabaseInternal
 import io.github.jan.supabase.auth.providers.Google
@@ -158,47 +159,53 @@ fun LoginScreen(
                 ),
                 keyboardActions = KeyboardActions(onNext = { focusRequester.requestFocus() }),
                 leadingIcon = { Icon(Icons.Outlined.Email, "Mail") },
+                modifier = Modifier.fillMaxWidth(),
             )
 
-            Box {
-                PasswordField(
-                    value = password,
-                    onValueChange = { password = it },
-                    modifier = Modifier
-                        .focusRequester(focusRequester)
-                        .align(Alignment.TopCenter)
-                        .padding(
-                            top = 10.dp,
-                            bottom = 24.dp // padding for forgot password button
-                        ),
-                    label = { Text("Password") },
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Password,
-                        imeAction = ImeAction.Done
-                    ),
-                    keyboardActions = KeyboardActions(onDone = {
-                        authenticate(isSignUp, signIn, signUp, email, password)
-                        focusManager.clearFocus()
-                    }),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = colorScheme.background,
-                        unfocusedContainerColor = colorScheme.background,
-                    ),
-                    shape = OutlinedTextFieldDefaults.shape,
-                    supportingText = null,
-                )
+            Spacer(Modifier.height(10.dp))
 
-                if (!isSignUp) {
+            PasswordField(
+                value = password,
+                onValueChange = { password = it },
+                modifier = Modifier
+                    .focusRequester(focusRequester)
+                    .fillMaxWidth(),
+                label = { Text("Password") },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(onDone = {
+                    authenticate(isSignUp, signIn, signUp, email, password)
+                    focusManager.clearFocus()
+                }),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = colorScheme.background,
+                    unfocusedContainerColor = colorScheme.background,
+                ),
+                shape = OutlinedTextFieldDefaults.shape,
+                supportingText = null,
+            )
+
+            if (!isSignUp) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
                     TextButton(
                         onClick = onForgotPassword,
                         contentPadding = ButtonDefaults.TextButtonContentPadding,
                         shape = ButtonDefaults.textShape,
-                        interactionSource = null,
-                        modifier = Modifier.align(Alignment.BottomEnd),
                     ) {
-                        Text("Forgot password?")
+                        Text(
+                            text = "Forgot password?",
+                            color = colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold,
+                        )
                     }
                 }
+            } else {
+                Spacer(Modifier.height(8.dp))
             }
 
             Button(
@@ -206,74 +213,62 @@ fun LoginScreen(
                     authenticate(isSignUp, signIn, signUp, email, password)
                     focusManager.clearFocus()
                 },
-                modifier = Modifier.padding(top = 10.dp),
-                enabled = email.isNotBlank() && password.isNotBlank()
-            ) {
-                Text(if (isSignUp) "Register" else "Login")
-            }
-
-            // Divider with text
-            Row(
+                enabled = email.isNotBlank() && password.isNotBlank(),
+                shape = RoundedCornerShape(28.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = colorScheme.primary,
+                    contentColor = colorScheme.onPrimary,
+                    // Light-green disabled state per design — uses
+                    // primaryContainer so it reads as "available but not
+                    // yet active" rather than greyed-out neutral.
+                    disabledContainerColor = colorScheme.primaryContainer,
+                    disabledContentColor = colorScheme.primary,
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(32.dp)
-                    .background(colorScheme.background),
-                verticalAlignment = Alignment.CenterVertically
+                    .height(56.dp),
             ) {
-                HorizontalDivider(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(end = 16.dp),
-                    thickness = 1.dp,
-                    color = colorScheme.primary
-                )
-
-                val orText = if (isSignUp) "Or Register With" else "Or Login With"
                 Text(
-                    text = orText,
-                    modifier = Modifier
-                        .padding(vertical = 4.dp, horizontal = 8.dp),
-                    color = colorScheme.primary,
-                )
-                HorizontalDivider(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 16.dp),
-                    thickness = 1.dp,
-                    color = colorScheme.primary
+                    text = if (isSignUp) "Register" else "Login",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 16.sp,
                 )
             }
+
+            // Centered "or login with" — no dividers, sentence-case copy.
+            Text(
+                text = if (isSignUp) "Or sign up with" else "Or login with",
+                modifier = Modifier.padding(vertical = 24.dp),
+                color = colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+            )
 
             // Apple sign-in is intentionally hidden until an Apple developer
             // account is provisioned (see project_docs/PRD.md §4.1).
-            Row(
+            OutlinedButton(
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = colorScheme.background,
+                    contentColor = colorScheme.primary,
+                ),
+                border = BorderStroke(1.dp, colorScheme.primary),
+                onClick = {
+                    googleSignIn.startFlow()
+                },
+                shape = RoundedCornerShape(8.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 32.dp),
-                horizontalArrangement = Arrangement.Center,
+                    .height(56.dp),
             ) {
-                OutlinedButton(
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = colorScheme.background,
-                        contentColor = colorScheme.primary,
-                    ),
-                    border = BorderStroke(1.dp, colorScheme.primary),
-                    onClick = {
-                        googleSignIn.startFlow()
-                    },
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                ) {
-                    ProviderIcon(
-                        provider = Google,
-                        contentDescription = "Google",
-                        modifier = Modifier.size(32.dp),
-                    )
-                    Spacer(Modifier.size(12.dp))
-                    Text("Continue with Google")
-                }
+                ProviderIcon(
+                    provider = Google,
+                    contentDescription = "Google",
+                    modifier = Modifier.size(28.dp),
+                )
+                Spacer(Modifier.size(12.dp))
+                Text(
+                    text = "Continue with Google",
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
 
             TextButton(

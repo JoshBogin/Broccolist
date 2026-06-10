@@ -1,6 +1,7 @@
 package com.broccolist.app.presentation
 
 import BroccolistTheme.BroccolistTheme
+import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -84,6 +85,8 @@ fun App(
 
                 composable<Route.ResetPasswordRequest>(
                     enterTransition = { slideInHorizontally { it } },
+                    // Stay still when revealed by a pop from a forward screen
+                    popEnterTransition = { EnterTransition.None },
                     popExitTransition = { slideOutHorizontally { it } },
                 ) {
                     val loginViewModel = koinViewModel<LoginViewModel>()
@@ -101,6 +104,7 @@ fun App(
 
                 composable<Route.ResetPasswordSent>(
                     enterTransition = { slideInHorizontally { it } },
+                    popEnterTransition = { EnterTransition.None },
                     popExitTransition = { slideOutHorizontally { it } },
                 ) { backStackEntry ->
                     val args: Route.ResetPasswordSent = backStackEntry.toRoute()
@@ -120,6 +124,7 @@ fun App(
 
                 composable<Route.ResetPasswordCreate>(
                     enterTransition = { slideInHorizontally { it } },
+                    popEnterTransition = { EnterTransition.None },
                     popExitTransition = { slideOutHorizontally { it } },
                 ) {
                     val loginViewModel = koinViewModel<LoginViewModel>()

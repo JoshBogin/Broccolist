@@ -1,7 +1,7 @@
 # Broccolist — Product Requirements Document
 
-**Status:** Draft v1 (Phase 0 implementation in progress)
-**Last updated:** 2026-06-02
+**Status:** Phase 0 complete; Phase 1 not yet started.
+**Last updated:** 2026-06-05
 **Owner:** Josh Bogin
 
 ## Phase 0 progress (this session)
@@ -45,6 +45,20 @@ Copilot reviewed the Phase 0 PR and flagged five issues. Status:
 
 Auth surface is functionally green on both platforms: email/password with verification + reset, Google sign-in (Android Credential Manager + iOS OAuth web fallback), guest mode with auto-clear on sign-in, Apple hidden until dev account is available, publishable key with RLS-enforced data access. Ready to move into Phase 1 (Dashboard + multi-list + inline rename).
 
+### Phase 0 polish (this session)
+
+After Phase 0 was functionally complete, a round of UX/theme refinements landed:
+
+- **Login screen redesign.** Email, password, Login button, and Google button all share the same width (`fillMaxWidth()` inside the column's 24.dp horizontal padding). `singleLine = true` on the text fields means long input scrolls horizontally instead of expanding the field. The Login button is now `height(56.dp)` with `RoundedCornerShape(28.dp)` (full pill). Active state uses `primary` / `onPrimary`; disabled state uses `primaryContainer` / `primary` for a light-green "available but not yet active" look. The "Or Login With" row dropped its horizontal dividers and is now centered sentence-case ("Or login with" / "Or sign up with"). "Forgot password?" moved from a Box overlay on the password field into its own right-aligned row below.
+- **Theme tightening.** `BroccolistColors` gained two new colors: `PrimaryGreenLight = #81C784` (the bright accent for dark mode, replaces the near-white `LightGreen` that disappeared against the brand) and `PrimaryGreenDark = #1F4F2A` (muted darker green used for dark-mode disabled surfaces). In light mode, `primaryContainer` flipped from `White` to `SelectionGreen` — this was the missing piece behind several invisible affordances: disabled buttons, reset-flow icon badges, and any other UI that leans on `primaryContainer` for a light-green surface. `SelectionGreen` itself was bumped twice — first from `#DDFFE3` (almost imperceptibly different from white) to Material Green 100 (`#C8E6C9`), then to Green 200 (`#A5D6A7`) when the lower-saturation Green 100 still wasn't reading on a white background. In dark mode, `primary` and `secondary` moved off the near-white `LightGreen` to `PrimaryGreenLight`, and `primaryContainer` moved from `Black` to `PrimaryGreenDark`.
+- **Reset-flow navigation animations.** Each reset-flow composable now explicitly sets `popEnterTransition = { EnterTransition.None }`. Without it, nav-compose falls back to `enterTransition` for the popped-to screen, causing both screens to slide in from the right at the same time (a visible crisscross). With the override, the revealed previous screen sits still while the current one slides off to the right.
+- **Icons stay on the core Material set.** The reset-flow designs used `Visibility`/`VisibilityOff` (eye toggle) and `VerifiedUser` (shield-with-check), all of which live in `material-icons-extended`. To avoid adding the artifact (~2 MB), the password-visibility toggle is a `TextButton` showing "Show" / "Hide", and the shield-with-check is substituted with `Icons.Outlined.Lock` for badges and `Icons.Filled.Check` for the continue button. Future Phase-1 visual work can add the extended icons artifact if richer icons are desired.
+
+### Phase 0 follow-ups (not done in this session)
+
+- **`PasswordRecoveryDialog.kt` is dead code** — no references remain after the reset-flow screens replaced it. The session couldn't delete it (read-only mount); remove it manually: `composeApp/src/commonMain/kotlin/com/broccolist/login/presentation/components/PasswordRecoveryDialog.kt`.
+- **Upgrade supabase-kt to 3.1+** — unlocks `ExternalAuthAction.WebAuthenticationSession` on iOS, lets iOS return to PKCE, and removes the "Open in Broccolist?" prompt that appears today after the OAuth web round-trip.
+
 
 ## 1. Vision
 
@@ -59,8 +73,8 @@ Broccolist is a Kotlin Multiplatform grocery list app for Android and iOS. The c
 - **Navigation:** JetBrains Navigation Compose 2.8.0-alpha10, type-safe routes via `@Serializable` sealed interface in `app/data/Route.kt`.
 - **DI:** Koin 4.0 (`koin-compose-viewmodel`). Entry points: `BroccolistApplication.kt` (Android), `MainViewController.kt` (iOS).
 - **State:** `androidx.lifecycle.ViewModel` + `MutableStateFlow`, collected with `collectAsState()`.
-- **Backend:** Supabase 3.0.3 — Postgrest for CRUD, `auth-kt` + `ComposeAuth` for auth, `realtime-kt` installed but **not yet wired up**.
-- **Auth:** Email/password, Google native (Android only — broken on iOS), Apple native (not functional on either platform — requires an Apple developer account). PKCE flow. Deep link scheme `io.supabase.broccolist://login-callback`.
+- **Backend:** Supabase 3.0.3 — Postgrest for CRUD, `auth-kt` + `ComposeAuth` for auth, `realtime-kt` installed but **not yet wired up**. Client uses a **publishable key** (`sb_publishable_...`) and all data tables enforce per-user RLS policies.
+- **Auth:** Email/password with verification + reset deep link, Google native (Android via Credential Manager / Play Services Auth bridge, iOS via Supabase OAuth web fallback), guest mode (in-memory). Apple hidden in UI until a developer account is available. Flow type is platform-specific: PKCE on Android, IMPLICIT on iOS (supabase-kt 3.0.3 limitation; supabase-kt 3.1+ will let iOS return to PKCE). Deep link scheme `io.supabase.broccolist://login-callback`, routed through SwiftUI `.onOpenURL` on iOS (UIScene lifecycle bypasses `AppDelegate.application(_:open:)`).
 - **HTTP:** Ktor 3.0.3 — OkHttp engine on Android, Darwin engine on iOS.
 - **Serialization:** kotlinx.serialization 1.7.3.
 - **Build:** Gradle 8.6.1, AGP 8.5.2, Kotlin 2.1.0, detekt 1.23.0. No convention plugins yet; single `composeApp` module.
@@ -68,13 +82,13 @@ Broccolist is a Kotlin Multiplatform grocery list app for Android and iOS. The c
 
 ### 2.2 Current Features
 
-- Email/password sign-in (works, but email verification and password reset paths are not polished).
-- Google native sign-in **on Android only** — iOS path is not functional.
-- Apple native sign-in scaffolded but **non-functional on both platforms** (blocked on Apple developer account).
+- Email/password sign-in with verification ("check your email" alert after signup, clear error when the user tries to sign in before verifying) and password reset (four-screen flow: request → sent → create → success).
+- Google sign-in on both platforms.
+- Guest mode — local, in-memory data, gated from any feature that needs a Supabase session. Auto-clears when the user later authenticates.
 - One auto-created grocery list per user (named "New List").
 - Add a store section to the list from a fixed catalog of 10 (`Produce`, `Deli`, `Meat`, `Bakery`, `Pantry`, `Snacks`, `Beverages`, `Frozen`, `Dairy`, `Other`) plus a `Custom(name)` variant.
 - Add items inside a section, check/uncheck them, delete them (swipe).
-- **Rename sections** (already supported via `updateSection`).
+- Rename sections (already supported via `updateSection`).
 - Sign out.
 
 ### 2.3 Known Limitations (the things this PRD fixes)
@@ -83,10 +97,9 @@ Broccolist is a Kotlin Multiplatform grocery list app for Android and iOS. The c
 - **Items cannot be reordered or moved between sections** — no `position`/`order` column anywhere.
 - **Only one list per user** — `getCheckList` returns `lists.firstOrNull()` and auto-creates if none exist. No multi-list support.
 - **No sharing, no friends, no recipes.**
-- **No offline support** — every read/write goes straight to Postgrest. `_checkLists` is in-memory only; restart = full reload.
+- **No offline support** — every read/write goes straight to Postgrest. `_checkLists` is in-memory only; restart = full reload. (Same applies to guest mode — local data does not survive an app kill.)
 - **Realtime is dead code** — the dependency is on the classpath but no subscriptions exist.
 - **Nav drawer has only a "Home" tab** — there is no dashboard.
-- **Auth gaps:** Google sign-in fails on iOS, Apple sign-in is broken on both platforms, email verification and password-reset flows are unfinished, and there is no guest / local-only mode.
 
 ### 2.4 Current Data Model
 

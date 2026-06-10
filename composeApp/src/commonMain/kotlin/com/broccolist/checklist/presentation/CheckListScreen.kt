@@ -272,7 +272,7 @@ fun CheckListScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(colorScheme.primaryContainer),
+                        .background(colorScheme.surface),
                 ) {
                     IconButton(
                         onClick = {
