@@ -1,29 +1,30 @@
 import UIKit
 import SwiftUI
+import GoogleSignIn
 import ComposeApp
 
 struct ComposeView: UIViewControllerRepresentable {
-    var url: URL?
-
     func makeUIViewController(context: Context) -> UIViewController {
-        print("Deeplink: \(url)")
-        return MainViewControllerKt.MainViewController(url: url ?? nil)
+        return MainViewControllerKt.MainViewController(url: nil)
     }
 
-    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
-        print("Deeplink update: \(url)")
-    }
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}
 }
 
 struct ContentView: View {
-    @State private var deepLinkURL: URL?
-    
     var body: some View {
-        ComposeView(url: deepLinkURL)
+        ComposeView()
             .ignoresSafeArea(.keyboard) // Compose has own keyboard handler
             .onOpenURL { url in
-                print("Received URL 123: \(url)")
-                deepLinkURL = url
+                // SwiftUI App lifecycle uses scene-based URL handling. The
+                // AppDelegate's `application(_:open:)` is NOT invoked here —
+                // we have to wire deep links through `.onOpenURL`.
+                print("ContentView.onOpenURL: \(url)")
+                if GIDSignIn.sharedInstance.handle(url) {
+                    return
+                }
+                // Forward Supabase OAuth / magic-link / verification URLs.
+                MainViewControllerKt.handleSupabaseDeeplink(url: url)
             }
     }
 }

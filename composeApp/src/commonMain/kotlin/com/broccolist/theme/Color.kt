@@ -3,11 +3,17 @@ import androidx.compose.ui.graphics.Color
 object BroccolistColors {
     // Main brand colors
     val PrimaryGreen = Color(0xFF378A49)
+    /** Bright green used as the active accent in dark mode */
+    val PrimaryGreenLight = Color(0xFF81C784)
+    /** Darker green used for the disabled container in dark mode. */
+    val PrimaryGreenDark = Color(0xFF1F4F2A)
     val LightGreen = Color(0xFFF7FFF9)
     val LightGray = Color(0xFFFCFCFC)
     val DarkGreen = Color(0xFF001103)
     val DarkGray = Color(0xFF0A0A0A)
-    val SelectionGreen = Color(0xFFDDFFE3)
+    /** Light-green surface for disabled buttons, icon badges, and drawer
+     *  selection highlight. */
+    val SelectionGreen = Color(0xFFA5D6A7)
     val CheckGreen = Color(0xFF558F61)
     val SelectionGreenDark = Color(0xFF002E09)
     val ModalSheetLightGray = Color(0xFFFAFAFA)

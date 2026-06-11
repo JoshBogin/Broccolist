@@ -23,7 +23,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme.colorScheme
 import androidx.compose.material3.OutlinedButton
@@ -45,22 +44,20 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration.Companion.Underline
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.broccolist.login.presentation.components.BroccolistHeader
-import com.broccolist.login.presentation.components.OTPDialogState
-import com.broccolist.login.presentation.components.PasswordRecoveryDialog
 import io.github.jan.supabase.annotations.SupabaseInternal
-import io.github.jan.supabase.auth.providers.Apple
 import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.compose.auth.ComposeAuth
 import io.github.jan.supabase.compose.auth.composable.NativeSignInResult
 import io.github.jan.supabase.compose.auth.composable.NativeSignInState
-import io.github.jan.supabase.compose.auth.composable.rememberSignInWithApple
 import io.github.jan.supabase.compose.auth.composable.rememberSignInWithGoogle
 import io.github.jan.supabase.compose.auth.ui.ProviderIcon
 import io.github.jan.supabase.compose.auth.ui.annotations.AuthUiExperimental
@@ -70,7 +67,8 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun LoginScreenRoute(
     viewModel: LoginViewModel = koinViewModel(),
-    onLoginSuccess: () -> Unit
+    onLoginSuccess: () -> Unit,
+    onForgotPassword: () -> Unit,
 ) {
     LoginScreen(
         onLoginSuccess = onLoginSuccess,
@@ -79,8 +77,8 @@ fun LoginScreenRoute(
         signIn = viewModel::login,
         signUp = viewModel::signUp,
         signInWithGoogle = viewModel::signInWithGoogle,
-        signInWithApple = viewModel::signInWithApple,
-        resetPassword = viewModel::resetPassword,
+        continueAsGuest = viewModel::continueAsGuest,
+        onForgotPassword = onForgotPassword,
         loginAlert = viewModel.alert.collectAsState().value,
         resetAlert = viewModel::resetAlert,
     )
@@ -95,19 +93,16 @@ fun LoginScreen(
     signIn: (String, String) -> Unit,
     signUp: (String, String) -> Unit,
     signInWithGoogle: () -> Unit,
-    signInWithApple: () -> Unit,
-    resetPassword: (String) -> Unit,
+    continueAsGuest: () -> Unit,
+    onForgotPassword: () -> Unit,
     loginAlert: String?,
     resetAlert: () -> Unit,
 ) {
     val googleSignIn = googleSignIn(supabaseAuth, signInWithGoogle)
-    val appleSignIn = appleSignIn(supabaseAuth, signInWithApple)
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
     var isSignUp by remember { mutableStateOf(false) }
     var email by remember { mutableStateOf("") }
-    var otpDialogState by remember { mutableStateOf<OTPDialogState>(OTPDialogState.Invisible) }
-    var showPasswordRecoveryDialog by remember { mutableStateOf(false) }
     var password by remember { mutableStateOf("") }
 
     LaunchedEffect(sessionStatus) {
@@ -164,47 +159,53 @@ fun LoginScreen(
                 ),
                 keyboardActions = KeyboardActions(onNext = { focusRequester.requestFocus() }),
                 leadingIcon = { Icon(Icons.Outlined.Email, "Mail") },
+                modifier = Modifier.fillMaxWidth(),
             )
 
-            Box {
-                PasswordField(
-                    value = password,
-                    onValueChange = { password = it },
-                    modifier = Modifier
-                        .focusRequester(focusRequester)
-                        .align(Alignment.TopCenter)
-                        .padding(
-                            top = 10.dp,
-                            bottom = 24.dp // padding for forgot password button
-                        ),
-                    label = { Text("Password") },
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Password,
-                        imeAction = ImeAction.Done
-                    ),
-                    keyboardActions = KeyboardActions(onDone = {
-                        authenticate(isSignUp, signIn, signUp, email, password)
-                        focusManager.clearFocus()
-                    }),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = colorScheme.background,
-                        unfocusedContainerColor = colorScheme.background,
-                    ),
-                    shape = OutlinedTextFieldDefaults.shape,
-                    supportingText = null,
-                )
+            Spacer(Modifier.height(10.dp))
 
-                if (!isSignUp) {
+            PasswordField(
+                value = password,
+                onValueChange = { password = it },
+                modifier = Modifier
+                    .focusRequester(focusRequester)
+                    .fillMaxWidth(),
+                label = { Text("Password") },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(onDone = {
+                    authenticate(isSignUp, signIn, signUp, email, password)
+                    focusManager.clearFocus()
+                }),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = colorScheme.background,
+                    unfocusedContainerColor = colorScheme.background,
+                ),
+                shape = OutlinedTextFieldDefaults.shape,
+                supportingText = null,
+            )
+
+            if (!isSignUp) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
                     TextButton(
-                        onClick = { showPasswordRecoveryDialog = true },
+                        onClick = onForgotPassword,
                         contentPadding = ButtonDefaults.TextButtonContentPadding,
                         shape = ButtonDefaults.textShape,
-                        interactionSource = null,
-                        modifier = Modifier.align(Alignment.BottomEnd),
                     ) {
-                        Text("Forgot password?")
+                        Text(
+                            text = "Forgot password?",
+                            color = colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold,
+                        )
                     }
                 }
+            } else {
+                Spacer(Modifier.height(8.dp))
             }
 
             Button(
@@ -212,90 +213,72 @@ fun LoginScreen(
                     authenticate(isSignUp, signIn, signUp, email, password)
                     focusManager.clearFocus()
                 },
-                modifier = Modifier.padding(top = 10.dp),
-                enabled = email.isNotBlank() && password.isNotBlank()
-            ) {
-                Text(if (isSignUp) "Register" else "Login")
-            }
-
-            // Divider with text
-            Row(
+                enabled = email.isNotBlank() && password.isNotBlank(),
+                shape = RoundedCornerShape(28.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = colorScheme.primary,
+                    contentColor = colorScheme.onPrimary,
+                    // Light-green disabled state per design — uses
+                    // primaryContainer so it reads as "available but not
+                    // yet active" rather than greyed-out neutral.
+                    disabledContainerColor = colorScheme.primaryContainer,
+                    disabledContentColor = colorScheme.primary,
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(32.dp)
-                    .background(colorScheme.background),
-                verticalAlignment = Alignment.CenterVertically
+                    .height(56.dp),
             ) {
-                HorizontalDivider(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(end = 16.dp),
-                    thickness = 1.dp,
-                    color = colorScheme.primary
-                )
-
-                val orText = if (isSignUp) "Or Register With" else "Or Login With"
                 Text(
-                    text = orText,
-                    modifier = Modifier
-                        .padding(vertical = 4.dp, horizontal = 8.dp),
-                    color = colorScheme.primary,
-                )
-                HorizontalDivider(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 16.dp),
-                    thickness = 1.dp,
-                    color = colorScheme.primary
+                    text = if (isSignUp) "Register" else "Login",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 16.sp,
                 )
             }
 
-            Row(
+            // Centered "or login with" — no dividers, sentence-case copy.
+            Text(
+                text = if (isSignUp) "Or sign up with" else "Or login with",
+                modifier = Modifier.padding(vertical = 24.dp),
+                color = colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+            )
+
+            // Apple sign-in is intentionally hidden until an Apple developer
+            // account is provisioned (see project_docs/PRD.md §4.1).
+            OutlinedButton(
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = colorScheme.background,
+                    contentColor = colorScheme.primary,
+                ),
+                border = BorderStroke(1.dp, colorScheme.primary),
+                onClick = {
+                    googleSignIn.startFlow()
+                },
+                shape = RoundedCornerShape(8.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 32.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    .height(56.dp),
             ) {
-                OutlinedButton(
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = colorScheme.background,
-                        contentColor = colorScheme.primary,
-                    ),
-                    border = BorderStroke(1.dp, colorScheme.primary),
-                    onClick = {
-                        googleSignIn.startFlow()
-                    },
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(vertical = 8.dp)
-                ) {
-                    ProviderIcon(
-                        provider = Google,
-                        contentDescription = "Google",
-                        modifier = Modifier.size(32.dp),
-                    )
-                }
-                OutlinedButton(
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = colorScheme.background,
-                        contentColor = colorScheme.primary,
-                    ),
-                    border = BorderStroke(1.dp, colorScheme.primary),
-                    onClick = {
-                        appleSignIn.startFlow()
-                    },
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(vertical = 8.dp)
-                ) {
-                    ProviderIcon(
-                        provider = Apple,
-                        contentDescription = "Apple",
-                        modifier = Modifier.size(32.dp),
-                    )
-                }
+                ProviderIcon(
+                    provider = Google,
+                    contentDescription = "Google",
+                    modifier = Modifier.size(28.dp),
+                )
+                Spacer(Modifier.size(12.dp))
+                Text(
+                    text = "Continue with Google",
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+
+            TextButton(
+                onClick = {
+                    continueAsGuest()
+                    onLoginSuccess()
+                },
+                modifier = Modifier.padding(top = 8.dp),
+            ) {
+                Text("Continue as Guest")
             }
         }
 
@@ -313,20 +296,6 @@ fun LoginScreen(
             }
             Text(annotatedString)
         }
-    }
-
-    if (showPasswordRecoveryDialog) {
-        PasswordRecoveryDialog(
-            onDismiss = { showPasswordRecoveryDialog = false },
-            onConfirm = { resetEmail ->
-                resetPassword(resetEmail)
-                otpDialogState = OTPDialogState.Visible(
-                    title = "Password recovery",
-                    email = resetEmail,
-                    resetFlow = true
-                )
-            }
-        )
     }
 
     if (loginAlert != null) {
@@ -376,39 +345,6 @@ private fun googleSignIn(
         fallback = {
             println("Using fallback")
             signInWithGoogle()
-        }
-    )
-    return action
-}
-
-@Composable
-private fun appleSignIn( // TODO still need to setup apple oauth in supabase,
-    //   but this is blocked by apple dev account
-    supabaseAuth: ComposeAuth,
-    signInWithApple: () -> Unit,
-): NativeSignInState {
-    val action = supabaseAuth.rememberSignInWithApple(
-        onResult = { result ->
-            when (result) {
-                is NativeSignInResult.Success -> {
-                    println("Logged in successfully!")
-                }
-
-                NativeSignInResult.ClosedByUser -> {
-                    println("User closed the login dialog")
-                }
-
-                is NativeSignInResult.Error -> {
-                    println("Error logging in: ${result.message}")
-                }
-
-                is NativeSignInResult.NetworkError -> {
-                    println("Network error logging in: ${result.message}")
-                }
-            }
-        },
-        fallback = {
-            signInWithApple()
         }
     )
     return action

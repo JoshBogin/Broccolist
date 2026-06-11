@@ -95,13 +95,15 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun CheckListScreenRoute(
     viewModel: CheckListViewModel = koinViewModel(),
-    userSession: UserSession,
+    userSession: UserSession?,
     navController: NavController,
     onLogout: () -> Unit,
 ) {
     val list by viewModel.checkLists.collectAsState()
 
     LaunchedEffect(Unit) {
+        // Nullable userSession: null means we're in guest mode and the
+        // ViewModel will seed an in-memory list instead of hitting Supabase.
         viewModel.getList(userSession)
     }
 
@@ -270,7 +272,7 @@ fun CheckListScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(colorScheme.primaryContainer),
+                        .background(colorScheme.surface),
                 ) {
                     IconButton(
                         onClick = {

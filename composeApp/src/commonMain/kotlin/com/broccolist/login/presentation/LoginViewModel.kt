@@ -3,6 +3,7 @@ package com.broccolist.login.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.broccolist.core.data.AuthApi
+import com.broccolist.core.data.GuestModeRepository
 import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -11,6 +12,7 @@ import kotlinx.coroutines.launch
 
 class LoginViewModel(
     private val authApi: AuthApi,
+    private val guestModeRepository: GuestModeRepository,
 ) : ViewModel() {
     val composeAuth = authApi.composeAuth()
     val sessionStatus = authApi.sessionStatus().stateIn(
@@ -25,6 +27,10 @@ class LoginViewModel(
         viewModelScope.launch {
             kotlin.runCatching {
                 authApi.signUp(email, password)
+            }.onSuccess {
+                // Supabase is configured to require email confirmation, so
+                // there will be no session until the user clicks the link.
+                alert.value = "Check your email to verify your account, then sign in."
             }.onFailure {
                 alert.value = "There was an error while registering: ${it.message}"
             }
@@ -35,9 +41,33 @@ class LoginViewModel(
         viewModelScope.launch {
             kotlin.runCatching {
                 authApi.signIn(email, password)
+            }.onFailure { throwable ->
+                throwable.printStackTrace()
+                val message = throwable.message.orEmpty()
+                alert.value = when {
+                    // Supabase returns this verbatim for unconfirmed accounts.
+                    message.contains("Email not confirmed", ignoreCase = true) ||
+                        message.contains("not_confirmed", ignoreCase = true) ->
+                        "Your email isn't verified yet. Check your inbox for the verification link."
+                    else ->
+                        "There was an error while logging in. Check your credentials and try again."
+                }
+            }
+        }
+    }
+
+    fun resendVerificationEmail(email: String) {
+        if (email.isBlank()) {
+            alert.value = "Enter your email above first, then tap resend."
+            return
+        }
+        viewModelScope.launch {
+            kotlin.runCatching {
+                authApi.resendVerificationEmail(email)
+            }.onSuccess {
+                alert.value = "Verification email sent. Check your inbox."
             }.onFailure {
-                it.printStackTrace()
-                alert.value = "There was an error while logging in. Check your credentials and try again."
+                alert.value = "Couldn't resend verification email: ${it.message}"
             }
         }
     }
@@ -48,16 +78,18 @@ class LoginViewModel(
         }
     }
 
-    fun signInWithApple() {
-        viewModelScope.launch {
-            authApi.signInWithApple()
-        }
+    fun continueAsGuest() {
+        guestModeRepository.enterGuestMode()
     }
 
     fun resetPassword(email: String) {
         viewModelScope.launch {
             kotlin.runCatching {
                 authApi.resetPassword(email)
+            }.onSuccess {
+                alert.value = "Password reset link sent. Check your email."
+            }.onFailure {
+                alert.value = "Couldn't send reset email: ${it.message}"
             }
         }
     }

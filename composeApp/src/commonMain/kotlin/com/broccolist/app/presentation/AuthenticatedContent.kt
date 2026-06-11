@@ -12,17 +12,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.broccolist.app.data.Route
-import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.auth.user.UserSession
 
+/**
+ * Renders [content] when the user is signed in or in guest mode. For guest
+ * sessions, [content] receives `null` for the [UserSession] — downstream
+ * ViewModels branch on null to use local-only data paths.
+ */
 @Composable
 fun AuthenticatedContent(
-    sessionStatus: SessionStatus,
+    authState: AppAuthState,
     navController: NavController,
-    content: @Composable (UserSession) -> Unit
+    content: @Composable (UserSession?) -> Unit
 ) {
-    when (sessionStatus) {
-        is SessionStatus.NotAuthenticated -> {
+    when (authState) {
+        is AppAuthState.NotAuthenticated -> {
             println("Not authenticated")
             LaunchedEffect(Unit) {
                 navController.navigate(Route.Login) {
@@ -30,16 +34,20 @@ fun AuthenticatedContent(
                 }
             }
         }
-        is SessionStatus.Authenticated -> {
+        is AppAuthState.Authenticated -> {
             println("Authenticated")
-            content(sessionStatus.session)
+            content(authState.session)
         }
-        is SessionStatus.Initializing -> {
+        is AppAuthState.Guest -> {
+            println("Guest session")
+            content(null)
+        }
+        is AppAuthState.Initializing -> {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                 CircularProgressIndicator(modifier = Modifier.size(64.dp))
             }
         }
-        is SessionStatus.RefreshFailure -> {
+        is AppAuthState.RefreshFailure -> {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                 Text("Error refreshing session")
             }
