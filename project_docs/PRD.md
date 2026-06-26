@@ -1,6 +1,6 @@
 # Broccolist — Product Requirements Document
 
-**Status:** Phase 0 complete; Phase 1 in progress (dashboard + multi-list scaffolding shipped; inline rename pending).
+**Status:** Phase 0 complete; Phase 1 in progress (dashboard + multi-list scaffolding shipped; inline rename shipped).
 **Last updated:** 2026-06-12
 **Owner:** Josh Bogin
 
