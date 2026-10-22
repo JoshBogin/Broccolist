@@ -22,6 +22,7 @@ import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme.colorScheme
@@ -80,6 +81,7 @@ fun LoginScreenRoute(
         continueAsGuest = viewModel::continueAsGuest,
         onForgotPassword = onForgotPassword,
         loginAlert = viewModel.alert.collectAsState().value,
+        isAuthenticating = viewModel.isAuthenticating.collectAsState().value,
         resetAlert = viewModel::resetAlert,
     )
 }
@@ -96,6 +98,7 @@ fun LoginScreen(
     continueAsGuest: () -> Unit,
     onForgotPassword: () -> Unit,
     loginAlert: String?,
+    isAuthenticating: Boolean,
     resetAlert: () -> Unit,
 ) {
     val googleSignIn = googleSignIn(supabaseAuth, signInWithGoogle)
@@ -213,26 +216,42 @@ fun LoginScreen(
                     authenticate(isSignUp, signIn, signUp, email, password)
                     focusManager.clearFocus()
                 },
-                enabled = email.isNotBlank() && password.isNotBlank(),
+                // Disable while the auth call is in flight so a double-tap
+                // doesn't fire a second request. The button still shows the
+                // "active" color so the user can see something is happening
+                // — the spinner replaces the label.
+                enabled = email.isNotBlank() && password.isNotBlank() && !isAuthenticating,
                 shape = RoundedCornerShape(28.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = colorScheme.primary,
                     contentColor = colorScheme.onPrimary,
                     // Light-green disabled state per design — uses
                     // primaryContainer so it reads as "available but not
-                    // yet active" rather than greyed-out neutral.
-                    disabledContainerColor = colorScheme.primaryContainer,
-                    disabledContentColor = colorScheme.primary,
+                    // yet active" rather than greyed-out neutral. When
+                    // `isAuthenticating` is true we override below so the
+                    // button stays dark green with a spinner.
+                    disabledContainerColor =
+                        if (isAuthenticating) colorScheme.primary else colorScheme.primaryContainer,
+                    disabledContentColor =
+                        if (isAuthenticating) colorScheme.onPrimary else colorScheme.primary,
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
             ) {
-                Text(
-                    text = if (isSignUp) "Register" else "Login",
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 16.sp,
-                )
+                if (isAuthenticating) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = colorScheme.onPrimary,
+                        strokeWidth = 2.5.dp,
+                    )
+                } else {
+                    Text(
+                        text = if (isSignUp) "Register" else "Login",
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 16.sp,
+                    )
+                }
             }
 
             // Centered "or login with" — no dividers, sentence-case copy.

@@ -1,8 +1,35 @@
 # Broccolist — Product Requirements Document
 
-**Status:** Phase 0 complete; Phase 1 not yet started.
-**Last updated:** 2026-06-05
+**Status:** Phase 0 complete; Phase 1 in progress (dashboard + multi-list scaffolding shipped; inline rename shipped).
+**Last updated:** 2026-06-12
 **Owner:** Josh Bogin
+
+## Phase 1 progress (this session)
+
+Dashboard + multi-list support landed. What shipped:
+
+- **`material-icons-extended` artifact added** to `commonMain` so the dashboard can use `Outlined.Group`, `Outlined.RestaurantMenu`, etc. Adds ~2 MB but unlocks the design's icons without odd substitutions.
+- **Routes restructured.** `Route.Dashboard` is the new post-auth start destination. `Route.CheckList` is now `data class CheckList(val listId: Int)`. Added `Route.PersonalLists`, `Route.SharedLists`, `Route.Recipes`, `Route.Profile`.
+- **Multi-list data layer.** `SupabaseRepository` gained `getListsForUser`, `getListById`, `createList(name, userId)`, `renameList(listId, name)`, `deleteList(listId)`. The auto-create-on-first-load behavior in `getCheckList` is gone — new users land on the Personal Lists screen with an empty state and explicitly create their first list.
+- **New `GuestListStore`.** In-memory store backing guest-mode lists with full CRUD (sections, items, lists). Replaces the previous "single seeded list" pattern in `CheckListViewModel`. Hand-rolled negative-int IDs keep guest rows visually distinct from server-assigned IDs (useful for the Phase-3 migration code).
+- **DashboardScreen + DashboardViewModel.** Top bar (hamburger / logo / profile avatar), greeting "Good {timeOfDay}, {name}", hero "What are we shopping for?", three tiles (Personal Lists, Shared Lists, Recipes) with count badges and chevrons, and a "JUMP BACK IN" section showing up to 3 most-recently-edited lists with progress bars (checked/total items). Tiles open their respective screens.
+- **PersonalListsScreen + ViewModel.** Lists rendered as cards in a `LazyColumn`. Tap row → opens that list. Kebab menu → Rename / Delete (each opens a dialog). FAB → Create-list dialog. Empty state when no lists exist. Both authenticated and guest paths wired.
+- **Shared Lists / Recipes / Profile placeholder screens.** Top bar with back arrow, centered icon-badge, "Coming soon" copy. Shared Lists swaps to a "Sign up to share lists with friends" upsell when in guest mode.
+- **`CheckListScreen` is now listId-aware.** `CheckListScreenRoute` takes `listId: Int` and calls `viewModel.loadList(listId)`. The drawer's "Home" button now navigates to `Route.Dashboard` (was the now-removed bare `Route.CheckList`).
+- **Nav graph rebuilt in `App.kt`.** Dashboard as start destination; every Phase-1 screen wrapped in `AuthenticatedContent` so the guest/auth/initializing branches stay consistent. Slide-in-from-right enter transitions with explicit `popEnterTransition = EnterTransition.None` to keep popped-to screens still while the current slides off.
+- **DI updates.** `DashboardViewModel`, `PersonalListsViewModel`, and `GuestListStore` registered in `sharedModule` / `dataModule`.
+
+### Phase 1 polish (this session)
+
+- **Inline rename for items — DONE.** `ItemRow` always renders a `BasicTextField` (never swaps between Text and TextField). Unfocused, the field looks like plain text — no border, no cursor. Tap focuses it and the keyboard appears; pressing Done commits and dismisses, or blur (tapping the checkbox, swiping, scrolling away) commits via `onFocusChanged`. Empty / whitespace-only entries revert. Swipe-to-delete is gated on `!isFocused` so cursor / selection drags work while editing. External name changes (e.g. a server sync) flow into the draft buffer via `LaunchedEffect(item.name, isFocused)`, but only when the field is not focused, so an in-progress edit isn't overwritten. The previous "Text-swaps-to-TextField on tap" attempt was rejected because the parent `Row.draggable` was eating taps before the inner clickable could see them; the always-rendered TextField sidesteps the conflict by owning tap-to-focus itself. **Section headers intentionally keep the existing swipe → edit-icon → dialog flow** — the user asked for inline rename on items only.
+- **Section delete confirmation — DONE.** Every section-delete entry point in `SwipeableBox` (tapping the red swipe button, swiping past the auto-delete threshold mid-drag, and releasing past the trigger threshold) now funnels through a single `AlertDialog` ("Delete section? '\<name>' and all of its items will be permanently deleted."). Confirm uses `colorScheme.error` for the destructive verb; Cancel resets the row offset. Item delete still happens immediately on full swipe (matches a typical "swipe to delete a row in a list" pattern; items are cheaper to recreate than sections).
+
+### Phase 1 deferred (not in this session)
+
+- **Drag-and-drop reordering** of items within and across sections — still queued for Phase 2 per the original roadmap.
+- **Hamburger drawer content.** The dashboard's hamburger button currently routes to the Profile screen as a stub. A proper side drawer (Sign out, links to Personal/Shared/Recipes, theme toggle, etc.) is a Phase 2 polish item.
+- **Avatar stack on the Shared Lists tile.** The design shows overlapping member avatars on the Shared Lists card; that's blocked on Phase 4's friends/profiles tables. Today the tile just shows count 0.
+- **Friend-system Phase 4 dependencies.** Shared Lists is still a placeholder. The `profiles` / `friend_requests` / `friendships` / `list_members` tables haven't been created; that's all Phase 4.
 
 ## Phase 0 progress (this session)
 

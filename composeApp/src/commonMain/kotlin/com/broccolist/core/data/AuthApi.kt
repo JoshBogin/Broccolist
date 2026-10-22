@@ -38,6 +38,13 @@ sealed interface AuthApi {
 
     suspend fun signOut()
 
+    /**
+     * Force-refresh the current session using the stored refresh token.
+     * Throws if no refresh token exists or Supabase rejects the request —
+     * callers should catch and route the user back to sign-in.
+     */
+    suspend fun refreshSession()
+
     suspend fun resetPassword(email: String)
 
     suspend fun changePassword(newPassword: String)
@@ -103,6 +110,10 @@ internal class AuthApiImpl(
 
     override suspend fun signOut() {
         auth.signOut()
+    }
+
+    override suspend fun refreshSession() {
+        auth.refreshCurrentSession()
     }
 
     override suspend fun changePassword(newPassword: String) {

@@ -18,6 +18,7 @@ androidx-lifecycle = "2.8.4"
 androidx-test-junit = "1.2.1"
 splashscreen = "1.0.1"
 compose-multiplatform = "1.7.0"
+compose-material-icons-extended = "1.7.3"
 junit = "4.13.2"
 kotlin = "2.1.0"
 navigationCompose = "2.8.0-alpha10"
@@ -48,6 +49,7 @@ jetbrains-compose-navigation = { group = "org.jetbrains.androidx.navigation", na
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinCoroutines" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinSerialization" }
 
+compose-material-icons-extended = { module = "org.jetbrains.compose.material:material-icons-extended", version.ref = "compose-material-icons-extended" }
 androidx-credentials = { module = "androidx.credentials:credentials", version.ref = "credentials" }
 androidx-credentials-play-services-auth = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "credentials" }
 googleid = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }

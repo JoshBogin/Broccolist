@@ -51,7 +51,15 @@ Entry point: `initKoin()` called from `BroccolistApplication` (Android) and `Mai
 
 Type-safe navigation via JetBrains Navigation Compose (alpha). Routes are defined as a `@Serializable` sealed interface in `app/data/Route.kt`. The nav graph is set up in `App.kt` with slide transition animations.
 
-Reset-flow composables (and any future stacked flows) explicitly set `popEnterTransition = { EnterTransition.None }`. Without that override, nav-compose falls back to the screen's `enterTransition` when popping back to it, producing a visible crisscross as both screens slide in from the right simultaneously.
+Phase 1 routes:
+
+- `Route.Dashboard` — post-auth start destination; tile grid + Jump Back In.
+- `Route.PersonalLists` — user's personal lists with CRUD.
+- `Route.SharedLists`, `Route.Recipes`, `Route.Profile` — placeholders for Phase 4 / 5 features.
+- `Route.CheckList(listId: Int)` — single list view, parameterized by id.
+- `Route.Login` and the four `Route.ResetPassword*` routes — unchanged from Phase 0.
+
+Reset-flow composables (and the Phase-1 inner-graph composables) explicitly set `popEnterTransition = { EnterTransition.None }`. Without that override, nav-compose falls back to the screen's `enterTransition` when popping back to it, producing a visible crisscross as both screens slide in from the right simultaneously.
 
 ### State Management
 
@@ -92,13 +100,21 @@ Any CTA that gates on user input (Login, Send reset link, Update password) uses 
 
 ```
 com.broccolist/
-├── app/           # Root composable, AppViewModel, AppAuthState, Route definitions
-├── checklist/     # Main feature: checklist/section/item management
-├── login/         # Auth screens, LoginViewModel, reset-password flow screens
-├── core/          # AuthApi, HttpClientFactory, GuestModeRepository
-├── theme/         # Material3 theme, colors, typography
-└── di/            # Koin modules and platform bindings
+├── app/             # Root composable, AppViewModel, AppAuthState, Route definitions
+├── dashboard/       # Phase 1 entry: Dashboard, placeholder Shared/Recipes/Profile screens
+├── personallists/   # Personal Lists CRUD index screen + ViewModel
+├── checklist/       # Single list view: sections/items, optimistic edits
+├── login/           # Auth screens, LoginViewModel, reset-password flow screens
+├── core/            # AuthApi, HttpClientFactory, GuestModeRepository, GuestListStore
+├── theme/           # Material3 theme, colors, typography
+└── di/              # Koin modules and platform bindings
 ```
+
+### Multi-list data flow
+
+`SupabaseRepository` is the single auth-path data source: `getListsForUser(userId)`, `getListById(listId)`, `createList(name, userId)`, `renameList(listId, name)`, `deleteList(listId)`, plus the section/item CRUD that already existed. Authenticated screens refresh on entry (`LaunchedEffect(userId)`); they don't keep a Realtime subscription open yet.
+
+Guest mode uses a parallel `GuestListStore` (in-memory, `MutableStateFlow<List<CheckList>>`) registered as a Koin singleton. Both `DashboardViewModel` and `PersonalListsViewModel` `combine(isGuest, GuestListStore.lists, _authenticatedLists)` so the UI reacts to whichever side is the source of truth. `CheckListViewModel` writes through to `GuestListStore` for guest sessions and to `SupabaseRepository` for authenticated sessions. Phase 3 will collapse both paths once SQLDelight is the single source of truth on the client.
 
 ### Login Screen Layout
 
@@ -107,6 +123,14 @@ Email field, password field, "Forgot password?" (right-aligned in its own row), 
 ### GrocerySection
 
 `GrocerySection` is a sealed class in `checklist/domain/StoreSections.kt` with 10 predefined sections (Produce, Deli, Meat, Bakery, Pantry, Snacks, Beverages, Frozen, Dairy, Other) plus a `Custom` variant.
+
+### Item rename + section delete UX
+
+Two different patterns by design:
+
+- **Items rename inline via an always-rendered `BasicTextField`.** `ItemRow` does NOT swap between Text and TextField — the field is always there. Unfocused, it visually matches plain text (no border / cursor). Tap focuses it and the keyboard appears; Done or blur commits via `commitRename()`. Empty / whitespace-only inputs revert. The previous "swap on tap" approach was rejected because the parent `Row.draggable` was eating tap events before the inner clickable could see them — letting the TextField own tap-to-focus from the start avoids the gesture fight entirely. Swipe-to-delete is gated on `!isFocused` so cursor / selection drags work while editing. External name changes are synced into the draft buffer via `LaunchedEffect(item.name, isFocused)`, but only when not focused, so an in-progress edit isn't clobbered by a server-side update.
+- **Sections still rename via swipe → edit-icon → dialog** (the existing `SwipeableBox` behavior). Inline rename was scoped to items only.
+- **Section delete is always confirmation-gated.** All three entry points in `SwipeableBox` (tapping the red swipe button, full-swipe past `fullDeleteThreshold` mid-drag, releasing past `deleteThreshold`) flip a `showDeleteConfirmation` flag that opens an `AlertDialog`. Confirm calls `removeSection`; Cancel resets the row offset. Item delete still removes immediately on swipe — sections are heavier and contain other rows, so the extra friction is intentional there.
 
 ### Current phase
 

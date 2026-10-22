@@ -77,10 +77,20 @@ internal fun SwipeableBox(
     val fullDeleteThreshold = with(density) { -300.dp.toPx() }
 
     var showEditDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
     val showEditOption = offsetX > deleteThreshold
 
     val haptic = LocalHapticFeedback.current
     var hasTriggeredHaptic by remember { mutableStateOf(false) }
+
+    // Centralized "are we deleting this section?" dispatch — called from
+    // every delete path (tapping the swiped-out red background, swiping
+    // past the full-delete threshold, or releasing past the trigger
+    // threshold). Each path used to call `removeSection` directly; now
+    // they all flip this flag so the AlertDialog below gets the final say.
+    fun askToDeleteSection() {
+        showDeleteConfirmation = true
+    }
 
     // Reset offset when another section is being swiped
     LaunchedEffect(isCurrentlyBeingSwiped) {
@@ -134,10 +144,7 @@ internal fun SwipeableBox(
                         .fillMaxHeight()
                         .then(deleteWidth)
                         .background(colorScheme.error)
-                        .clickable {
-                            removeSection(section)
-                            onDeleteSwipe()
-                        }
+                        .clickable { askToDeleteSection() }
                         .padding(horizontal = 32.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -174,10 +181,13 @@ internal fun SwipeableBox(
                             onSwipeStateChange(section.id ?: 0)
                             offsetX += delta
 
-                            // Trigger delete if swiped past fullDeleteThreshold
+                            // Past the full-delete threshold — ask for
+                            // confirmation, snap the row back, and let the
+                            // AlertDialog handle the actual removal. Used
+                            // to delete unconditionally here, but section
+                            // delete is now confirmation-gated.
                             if (offsetX < fullDeleteThreshold) {
-                                removeSection(section)
-                                onDeleteSwipe()
+                                askToDeleteSection()
                                 offsetX = 0f
                             }
 
@@ -190,12 +200,12 @@ internal fun SwipeableBox(
                             }
                         },
                         onDragStopped = {
-                            // Delete row if swiped past deleteThreshold
+                            // Released past deleteThreshold — confirm before
+                            // removing. Snap to 0 so the row's resting
+                            // state matches "no pending action".
                             if (offsetX <= deleteThreshold) {
-                                removeSection(section)
-                                onDeleteSwipe()
+                                askToDeleteSection()
                                 offsetX = 0f
-                                // Otherwise, snap to edit/delete position or reset
                             } else if (offsetX <= showOptionsStartThreshold && offsetX > deleteThreshold) {
                                 offsetX = showOptionsThreshold
                             } else if (offsetX > showOptionsStartThreshold) {
@@ -230,6 +240,48 @@ internal fun SwipeableBox(
                     )
                 }
             }
+        }
+
+        // Delete confirmation. All three section-delete entry points
+        // (the swipe-revealed red button, a full-swipe past the trigger,
+        // and a release past the deleteThreshold) funnel into this one
+        // dialog so the user always sees a confirm step before a section
+        // and all its items are gone.
+        if (showDeleteConfirmation) {
+            AlertDialog(
+                onDismissRequest = {
+                    showDeleteConfirmation = false
+                    offsetX = 0f
+                },
+                title = { Text("Delete section?") },
+                text = {
+                    Text(
+                        "\"${section.section.displayName}\" and all of its items will be permanently deleted.",
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            removeSection(section)
+                            onDeleteSwipe()
+                            showDeleteConfirmation = false
+                            offsetX = 0f
+                        },
+                    ) {
+                        Text("Delete", color = colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            showDeleteConfirmation = false
+                            offsetX = 0f
+                        },
+                    ) {
+                        Text("Cancel")
+                    }
+                },
+            )
         }
 
         // Edit Dialog

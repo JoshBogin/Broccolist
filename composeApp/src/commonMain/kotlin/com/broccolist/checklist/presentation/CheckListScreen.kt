@@ -84,7 +84,6 @@ import com.broccolist.checklist.domain.has
 import com.broccolist.checklist.presentation.components.ItemInserter
 import com.broccolist.checklist.presentation.components.ItemSection
 import com.broccolist.checklist.presentation.components.SectionSelector
-import io.github.jan.supabase.auth.user.UserSession
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
@@ -95,16 +94,17 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun CheckListScreenRoute(
     viewModel: CheckListViewModel = koinViewModel(),
-    userSession: UserSession?,
+    listId: Int,
     navController: NavController,
     onLogout: () -> Unit,
 ) {
     val list by viewModel.checkLists.collectAsState()
 
-    LaunchedEffect(Unit) {
-        // Nullable userSession: null means we're in guest mode and the
-        // ViewModel will seed an in-memory list instead of hitting Supabase.
-        viewModel.getList(userSession)
+    LaunchedEffect(listId) {
+        // Phase 1 makes the screen list-id aware. Guest mode falls back to
+        // the in-memory GuestListStore via the ViewModel; authenticated
+        // users hit Supabase.
+        viewModel.loadList(listId)
     }
 
     CheckListScreen(
@@ -214,13 +214,21 @@ fun CheckListScreen(
                                     interactionSource = null,
                                     indication = null,
                                     onClick = {
-                                        navController.navigate(Route.CheckList)
+                                        navController.navigate(Route.Dashboard) {
+                                            popUpTo(Route.Dashboard) { inclusive = false }
+                                            launchSingleTop = true
+                                        }
                                     }
                                 )
                         ) {
                             IconButton(
                                 onClick = {
-                                    navController.navigate(Route.CheckList)
+                                    navController.navigate(Route.Dashboard) {
+                                        // Pop everything above Dashboard so
+                                        // we don't stack repeat instances.
+                                        popUpTo(Route.Dashboard) { inclusive = false }
+                                        launchSingleTop = true
+                                    }
                                 },
                                 modifier = Modifier
                                     .padding(horizontal = 16.dp)
