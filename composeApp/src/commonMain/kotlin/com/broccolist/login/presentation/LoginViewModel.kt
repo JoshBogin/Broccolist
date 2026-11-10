@@ -106,6 +106,15 @@ class LoginViewModel(
         }
     }
 
+    /**
+     * Surfaces a native Google sign-in failure (Credential Manager error,
+     * Supabase rejecting the ID token, network failure). User-initiated
+     * cancels are intentionally not routed here.
+     */
+    fun onGoogleSignInFailed(message: String) {
+        alert.value = message
+    }
+
     fun resetAlert() {
         alert.value = null
     }

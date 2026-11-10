@@ -77,6 +77,7 @@ fun LoginScreenRoute(
         signIn = viewModel::login,
         signUp = viewModel::signUp,
         signInWithGoogle = viewModel::signInWithGoogle,
+        onGoogleSignInFailed = viewModel::onGoogleSignInFailed,
         continueAsGuest = viewModel::continueAsGuest,
         onForgotPassword = onForgotPassword,
         loginAlert = viewModel.alert.collectAsState().value,
@@ -93,12 +94,13 @@ fun LoginScreen(
     signIn: (String, String) -> Unit,
     signUp: (String, String) -> Unit,
     signInWithGoogle: () -> Unit,
+    onGoogleSignInFailed: (String) -> Unit,
     continueAsGuest: () -> Unit,
     onForgotPassword: () -> Unit,
     loginAlert: String?,
     resetAlert: () -> Unit,
 ) {
-    val googleSignIn = googleSignIn(supabaseAuth, signInWithGoogle)
+    val googleSignIn = googleSignIn(supabaseAuth, signInWithGoogle, onGoogleSignInFailed)
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
     var isSignUp by remember { mutableStateOf(false) }
@@ -321,6 +323,7 @@ fun LoginScreen(
 private fun googleSignIn(
     supabaseAuth: ComposeAuth,
     signInWithGoogle: () -> Unit,
+    onFailure: (String) -> Unit,
 ): NativeSignInState {
     val action = supabaseAuth.rememberSignInWithGoogle(
         onResult = { result ->
@@ -335,10 +338,12 @@ private fun googleSignIn(
 
                 is NativeSignInResult.Error -> {
                     println("Error logging in: ${result.message}")
+                    onFailure("Google sign-in failed. Please try again.")
                 }
 
                 is NativeSignInResult.NetworkError -> {
                     println("Network error logging in: ${result.message}")
+                    onFailure("Couldn't reach Google. Check your connection and try again.")
                 }
             }
         },
