@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.broccolist.core.data.AuthApi
 import com.broccolist.core.data.GuestModeRepository
+import com.broccolist.core.data.SessionLoader
 import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
@@ -13,8 +14,13 @@ import kotlinx.coroutines.launch
 class AppViewModel(
     private val authApi: AuthApi,
     private val guestModeRepository: GuestModeRepository,
+    private val sessionLoader: SessionLoader,
 ) : ViewModel() {
     init {
+        // Load the saved session (idempotent — on Android the process
+        // lifecycle observer also calls this; SessionLoader dedupes).
+        sessionLoader.start()
+
         // If a guest later signs in (email/password, Google, or via email
         // verification deep link), drop the guest flag so downstream
         // ViewModels stop short-circuiting Supabase calls. Without this,
@@ -40,12 +46,21 @@ class AppViewModel(
     val authState = combine(
         authApi.sessionStatus(),
         guestModeRepository.isGuest,
-    ) { sessionStatus, isGuest ->
+        sessionLoader.initialLoadComplete,
+    ) { sessionStatus, isGuest, initialLoadComplete ->
         when (sessionStatus) {
             is SessionStatus.Authenticated -> AppAuthState.Authenticated(sessionStatus.session)
             is SessionStatus.RefreshFailure -> AppAuthState.RefreshFailure
             is SessionStatus.Initializing -> AppAuthState.Initializing
-            is SessionStatus.NotAuthenticated -> if (isGuest) AppAuthState.Guest else AppAuthState.NotAuthenticated
+            // With autoLoadFromStorage off, supabase-kt reports
+            // NotAuthenticated before SessionLoader has even read storage.
+            // Hold on the spinner until that first load finishes so a
+            // signed-in user isn't bounced to Login mid-refresh.
+            is SessionStatus.NotAuthenticated -> when {
+                isGuest -> AppAuthState.Guest
+                !initialLoadComplete -> AppAuthState.Initializing
+                else -> AppAuthState.NotAuthenticated
+            }
         }
     }.stateIn(
         scope = viewModelScope,
@@ -59,17 +74,16 @@ class AppViewModel(
     }
 
     /**
-     * Backs the "Try again" action on [SessionRefreshFailureScreen]. If the
-     * refresh succeeds, `sessionStatus` flips back to `Authenticated` and
-     * `AuthenticatedContent` swaps screens automatically. If it throws,
-     * we stay on the failure screen and the user can fall back to
-     * "Sign in again".
+     * Backs the "Try again" action on [SessionRefreshFailureScreen].
+     * Re-loads the saved session from storage and refreshes it (cancelling
+     * any attempt parked in supabase-kt's 10s network-retry delay). On
+     * success `sessionStatus` flips to `Authenticated` and
+     * `AuthenticatedContent` swaps screens automatically; on another network
+     * failure we stay here; if Supabase rejects the refresh token the session
+     * is cleared and the user lands on Login.
      */
     fun retrySession() {
-        viewModelScope.launch {
-            runCatching { authApi.refreshSession() }
-                .onFailure { it.printStackTrace() }
-        }
+        sessionLoader.retry()
     }
 
     /**
@@ -80,6 +94,7 @@ class AppViewModel(
     fun signOutAndExit() {
         guestModeRepository.exitGuestMode()
         viewModelScope.launch {
+            sessionLoader.cancel()
             runCatching { authApi.signOut() }
                 .onFailure { it.printStackTrace() }
         }
