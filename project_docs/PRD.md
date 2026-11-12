@@ -313,7 +313,13 @@ list_members
 
 Reads in the Shared Lists tab join `list_members` on the current `user_id`. Editor mutations go through the same Postgrest paths as personal lists, gated by row-level security.
 
-**Real-time editing:** subscribe to `lists`, `sections`, and `items` change feeds filtered by `list_id` for every shared list the user has open. Incoming changes merge into the local state. Conflict resolution is **last-write-wins** at the row level for v1 — fine for low-frequency grocery list edits but should be flagged for revisit if jitter becomes visible.
+**Real-time editing (decided: hybrid sync).** Realtime is a *nudge*, not the source of truth. Correctness comes from the delta-pull path in §4.9; Realtime only makes it fast.
+
+- **Why not Realtime alone:** `postgres_changes` doesn't replay events missed while the socket is down (iOS backgrounding, in-store dead zones, cold start), so a catch-up fetch is required anyway. Filters cover only one column on one table, so `items` can't be filtered by list without a denormalized `list_id`. DELETE events ignore filters and, with RLS on, carry only the primary key.
+- **Why not polling alone:** meeting the <2s target (§5) would take a poll every 1–2s per open list (~30–60 mostly empty requests/min/device). Slower polling makes co-shopping feel choppy.
+- **How it works:** while a shared list is open, the client subscribes to a single channel for it (changes to `lists` / `sections` / `items` where `list_id = X`). Every event, whatever its payload, triggers a debounced delta pull through `ListSyncCoordinator`. This sidesteps the DELETE/RLS payload quirks. If the channel fails to join or drops, the client falls back to a 15–30s poll until it reconnects.
+- **Conflicts:** **last-write-wins** at the row level for v1, but writes must send **only the changed columns** (PATCH), never a full-row upsert. Otherwise one editor checking an item can clobber a simultaneous rename by another. Revisit if jitter becomes visible.
+- **Schema prerequisites:** `items.list_id` (denormalized, kept in sync with `sections.list_id`) plus the `updated_at` / `deleted_at` columns from §4.9.
 
 ### 4.8 Recipes
 
@@ -362,8 +368,9 @@ The app moves to a **local-first** model. SQLDelight is the recommended choice f
 
 - SQLDelight is the source of truth the UI reads from. Repositories expose `Flow`s backed by SQLDelight queries.
 - Writes go to SQLDelight first (synchronous, optimistic), then a sync worker pushes the change to Supabase.
-- Supabase Realtime subscriptions feed back into the local DB so other devices' changes propagate.
-- Every mutable row needs an `updated_at` timestamp; conflicts resolve by last-write-wins on that timestamp.
+- **Delta pull is the source of truth for inbound changes.** `ListSyncCoordinator` fetches rows with `updated_at > cursor` for a list, upserts them into SQLDelight, and advances a per-list cursor. It runs on list open, app foreground, reconnect, and whenever a Realtime event arrives (§4.7). Realtime only speeds this up; dropping it never loses data.
+- Every mutable row (`lists`, `sections`, `items`) needs a server-maintained `updated_at` (set by a Postgres trigger, not the client clock) and a `deleted_at` for soft deletes. Without them, deletes can't be found by a delta query. Conflicts resolve by last-write-wins on `updated_at`, with column-level PATCH writes.
+- Soft-deleted rows are hard-deleted by a periodic server-side cleanup once they're older than a retention window (e.g. 30 days).
 - Writes that fail to reach Supabase (no signal, transient error) sit in an outbox table and retry with backoff.
 
 **Implications for the existing code:** `SupabaseRepositoryImpl` becomes one half of a two-layer repository — a `LocalListRepository` (SQLDelight) and a `RemoteListRepository` (current Postgrest code), with a `ListSyncCoordinator` brokering between them. ViewModels depend only on the local repository.
@@ -404,7 +411,8 @@ These need to be answered before or during implementation:
 
 - **Friend lookup field:** email-only, username-only, or both? Usernames need a uniqueness constraint and a public `profiles` table — email lookup leaks fewer identifiers but is harder to remember.
 - **Shared list table strategy:** add an `is_shared` flag to the existing `lists` table and let `list_members` drive access, or keep a separate `shared_lists` table? The former is simpler; the latter matches the original ask. Recommendation: single `lists` table + `list_members`.
-- **Realtime scope:** subscribe per-open-list, or maintain a persistent subscription to every shared list the user is a member of? The former is cheaper; the latter enables background notifications.
+- ~~**Realtime scope:** subscribe per-open-list, or maintain a persistent subscription to every shared list the user is a member of?~~ **Decided:** per-open-list, used only as an invalidation signal that triggers a delta pull (see §4.7 / §4.9). Background awareness of other lists comes from the delta pull on app foreground. Revisit if push notifications for list activity become a requirement.
+- **Realtime transport at scale:** `postgres_changes` checks RLS for each change against each subscriber. If concurrent shared-list usage grows, switch to Broadcast-from-database triggers. Not needed at launch.
 - **Recipe parsing backend:** LLM-via-edge-function vs deterministic parser vs both? Likely both — deterministic first pass, LLM fallback for ambiguous input.
 - **Push notifications:** in-scope for friends invites, or in-app only for v1? Current plan is in-app only.
 - **Item position storage:** integer with periodic rebalancing, or `lexorank`-style strings? Integer is simpler; lexorank scales better.
