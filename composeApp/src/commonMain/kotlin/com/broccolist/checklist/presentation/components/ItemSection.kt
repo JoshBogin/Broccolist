@@ -34,8 +34,8 @@ internal fun ItemSection(
     section: Section,
     onSwipe: () -> Unit = {},
     swipeInCooldown: Boolean = false,
-    currentlySwipedId: Int? = null,
-    onSwipeStateChange: (Int) -> Unit,
+    currentlySwipedId: String? = null,
+    onSwipeStateChange: (String) -> Unit,
     scrollState: ScrollState,
     isLastSection: Boolean,
 ) {
@@ -65,7 +65,7 @@ internal fun ItemSection(
             onUpdateSection = onUpdateSection,
             onDeleteSwipe = onSwipe,
             swipeInCooldown = swipeInCooldown,
-            isCurrentlyBeingSwiped = currentlySwipedId == section.id,
+            isCurrentlyBeingSwiped = currentlySwipedId == section.swipeKey,
             onSwipeStateChange = onSwipeStateChange,
         )
 
@@ -94,7 +94,7 @@ internal fun ItemSection(
                         },
                         onDeleteSwipe = onSwipe,
                         swipeInCooldown = swipeInCooldown,
-                        isCurrentlyBeingSwiped = currentlySwipedId == sectionItem.id,
+                        isCurrentlyBeingSwiped = currentlySwipedId == sectionItem.swipeKey,
                         onSwipeStateChange = onSwipeStateChange,
                     )
                 }

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.broccolist.core.data.AuthApi
 import com.broccolist.core.data.GuestModeRepository
 import io.github.jan.supabase.auth.status.SessionStatus
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,16 +38,18 @@ class LoginViewModel(
         if (_isAuthenticating.value) return
         _isAuthenticating.value = true
         viewModelScope.launch {
-            kotlin.runCatching {
+            try {
                 authApi.signUp(email, password)
-            }.onSuccess {
                 // Supabase is configured to require email confirmation, so
                 // there will be no session until the user clicks the link.
                 alert.value = "Check your email to verify your account, then sign in."
-            }.onFailure {
-                alert.value = describeAuthError(it, action = "registering")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                alert.value = describeAuthError(e, action = "registering")
+            } finally {
+                _isAuthenticating.value = false
             }
-            _isAuthenticating.value = false
         }
     }
 
@@ -54,13 +57,16 @@ class LoginViewModel(
         if (_isAuthenticating.value) return
         _isAuthenticating.value = true
         viewModelScope.launch {
-            kotlin.runCatching {
+            try {
                 authApi.signIn(email, password)
-            }.onFailure { throwable ->
-                throwable.printStackTrace()
-                alert.value = describeAuthError(throwable, action = "logging in")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                e.printStackTrace()
+                alert.value = describeAuthError(e, action = "logging in")
+            } finally {
+                _isAuthenticating.value = false
             }
-            _isAuthenticating.value = false
         }
     }
 

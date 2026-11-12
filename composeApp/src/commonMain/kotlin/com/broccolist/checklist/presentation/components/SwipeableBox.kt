@@ -66,7 +66,7 @@ internal fun SwipeableBox(
     onDeleteSwipe: () -> Unit = {},
     swipeInCooldown: Boolean = false,
     isCurrentlyBeingSwiped: Boolean,
-    onSwipeStateChange: (Int) -> Unit,
+    onSwipeStateChange: (String) -> Unit,
 ) {
     val focusManager = LocalFocusManager.current
     val density = LocalDensity.current
@@ -178,7 +178,7 @@ internal fun SwipeableBox(
                             // Clear focus when swiping
                             focusManager.clearFocus()
                             // Notify parent that this section is being swiped
-                            onSwipeStateChange(section.id ?: 0)
+                            onSwipeStateChange(section.swipeKey)
                             offsetX += delta
 
                             // Past the full-delete threshold — ask for

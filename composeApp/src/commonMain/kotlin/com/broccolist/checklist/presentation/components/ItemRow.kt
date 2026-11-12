@@ -63,7 +63,7 @@ internal fun ItemRow(
     onDeleteSwipe: () -> Unit = {},
     swipeInCooldown: Boolean = false,
     isCurrentlyBeingSwiped: Boolean,
-    onSwipeStateChange: (Int) -> Unit,
+    onSwipeStateChange: (String) -> Unit,
 ) {
     val focusManager = LocalFocusManager.current
     val density = LocalDensity.current
@@ -81,9 +81,13 @@ internal fun ItemRow(
     // tap-to-focus from the start — it visually matches plain Text when
     // unfocused, and the cursor + keyboard appear when focused. No separate
     // Text/TextField swap, no extra clickable competing with draggable.
-    val itemKey = item.id ?: 0
-    var draftName by remember(itemKey) { mutableStateOf(item.name) }
-    val interactionSource = remember(itemKey) { MutableInteractionSource() }
+    //
+    // Deliberately NOT keyed on item.id: an optimistic item starts with
+    // id == null and gets its real id when the insert returns. Keying on the
+    // id would reset the draft and drop focus at that moment, losing an
+    // in-progress edit. The LaunchedEffect below keeps the draft in sync.
+    var draftName by remember { mutableStateOf(item.name) }
+    val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
     // Sync the draft buffer with external changes to the item's name (e.g.
@@ -174,7 +178,7 @@ internal fun ItemRow(
                                 return@rememberDraggableState
                             }
                             focusManager.clearFocus()
-                            onSwipeStateChange(item.id ?: 0)
+                            onSwipeStateChange(item.swipeKey)
                             offsetX += delta
 
                             if (offsetX < fullDeleteThreshold) {

@@ -6,22 +6,52 @@ import com.broccolist.checklist.domain.Section
 import com.broccolist.checklist.domain.SectionItem
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.query.Order
+import kotlinx.datetime.Clock
 
 class SupabaseRepositoryImpl(
     private val client: SupabaseClient
 ) : SupabaseRepository {
     override suspend fun getListsForUser(userId: String): List<CheckList> {
         return try {
-            selectListsForUser(userId).map { entity ->
+            val listEntities = selectListsForUser(userId)
+            val listIds = listEntities.mapNotNull { it.id }
+            if (listIds.isEmpty()) return emptyList()
+
+            // Three bulk queries (lists → sections → items) instead of one
+            // per list / section, so the dashboard and Personal Lists screens
+            // get real item counts without an N+1 fan-out.
+            val sectionEntities = client.from("sections").select {
+                filter { SectionEntity::listId isIn listIds }
+            }.decodeList<SectionEntity>()
+
+            val sectionIds = sectionEntities.mapNotNull { it.id }
+            val itemsBySection = if (sectionIds.isEmpty()) {
+                emptyMap()
+            } else {
+                client.from("items").select {
+                    filter { ItemEntity::sectionId isIn sectionIds }
+                }.decodeList<ItemEntity>().groupBy { it.sectionId }
+            }
+
+            val sectionsByList = sectionEntities.groupBy { it.listId }.mapValues { (_, entities) ->
+                entities.map { entity ->
+                    Section(
+                        id = entity.id,
+                        section = GrocerySection.fromString(entity.name),
+                        items = itemsBySection[entity.id].orEmpty().map { it.toDomain() },
+                        listId = entity.listId,
+                    )
+                }
+            }
+
+            listEntities.map { entity ->
                 CheckList(
                     id = entity.id,
                     name = entity.name,
                     createdAt = entity.createdAt,
                     editedAt = entity.editedAt,
-                    // Sections are fetched lazily by the checklist screen.
-                    // The dashboard renders without them; if a screen needs
-                    // them, call getListById(id) explicitly.
-                    sections = emptyList(),
+                    sections = sectionsByList[entity.id].orEmpty(),
                     userId = entity.userId,
                 )
             }
@@ -30,6 +60,13 @@ class SupabaseRepositoryImpl(
             emptyList()
         }
     }
+
+    private fun ItemEntity.toDomain() = SectionItem(
+        id = id,
+        name = name,
+        isChecked = isChecked,
+        sectionId = sectionId,
+    )
 
     override suspend fun getListById(listId: Int): CheckList? {
         return try {
@@ -74,6 +111,9 @@ class SupabaseRepositoryImpl(
             client.from("lists").update(
                 {
                     CheckListEntity::name setTo name
+                    // Bumped client-side so "recently edited" ordering reflects
+                    // the rename. Phase 3 replaces this with a server trigger.
+                    CheckListEntity::editedAt setTo Clock.System.now().toString()
                 }
             ) {
                 filter { CheckListEntity::id eq listId }
@@ -96,6 +136,7 @@ class SupabaseRepositoryImpl(
     private suspend fun selectListsForUser(userId: String): List<CheckListEntity> {
         return client.from("lists").select {
             filter { CheckListEntity::userId eq userId }
+            order("edited_at", Order.DESCENDING)
         }.decodeList<CheckListEntity>()
     }
 

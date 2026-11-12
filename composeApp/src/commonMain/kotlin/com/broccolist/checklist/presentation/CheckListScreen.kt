@@ -141,7 +141,7 @@ fun CheckListScreen(
     val drawerState: DrawerState = rememberDrawerState(DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
     var swipeInCooldown by remember { mutableStateOf(false) }
-    var currentlySwipedId by remember { mutableStateOf<Int?>(null) }
+    var currentlySwipedId by remember { mutableStateOf<String?>(null) }
     var showSectionSelector by remember { mutableStateOf(false) }
     var showItemInserter by remember { mutableStateOf(false) }
     val colorScheme = MaterialTheme.colorScheme
