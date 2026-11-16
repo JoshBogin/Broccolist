@@ -32,6 +32,12 @@ val supabaseModule = module {
         ) {
             install(Auth) {
                 platformAuthConfig()
+                // Session loading is owned by `SessionLoader`. With both of
+                // these on, Android cold starts ran two concurrent refreshes
+                // of an expired session (init + ProcessLifecycle onStart),
+                // which could strand the app in RefreshFailure.
+                autoLoadFromStorage = false
+                enableLifecycleCallbacks = false
             }
             install(ComposeAuth) {
                 googleNativeLogin("299296791038-in8oqrmivn8f7a096lgn7if70v32qsth.apps.googleusercontent.com") // Web Client ID
