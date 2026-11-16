@@ -52,7 +52,7 @@ fun App(
                 composable<Route.Dashboard>(
                     exitTransition = { slideOutHorizontally() },
                     popEnterTransition = { slideInHorizontally() },
-                ) {
+                ) { entry ->
                     AuthenticatedContent(
                         authState = authState,
                         appViewModel = viewModel,
@@ -65,14 +65,14 @@ fun App(
                                 // Profile screen too — the design's "side
                                 // drawer" can come once we have multiple
                                 // global actions worth grouping.
-                                navController.navigate(Route.Profile)
+                                entry.ifResumed { navController.navigate(Route.Profile) }
                             },
-                            onOpenProfile = { navController.navigate(Route.Profile) },
-                            onPersonalLists = { navController.navigate(Route.PersonalLists) },
-                            onSharedLists = { navController.navigate(Route.SharedLists) },
-                            onRecipes = { navController.navigate(Route.Recipes) },
+                            onOpenProfile = { entry.ifResumed { navController.navigate(Route.Profile) } },
+                            onPersonalLists = { entry.ifResumed { navController.navigate(Route.PersonalLists) } },
+                            onSharedLists = { entry.ifResumed { navController.navigate(Route.SharedLists) } },
+                            onRecipes = { entry.ifResumed { navController.navigate(Route.Recipes) } },
                             onOpenList = { listId ->
-                                navController.navigate(Route.CheckList(listId))
+                                entry.ifResumed { navController.navigate(Route.CheckList(listId)) }
                             },
                         )
                     }
@@ -83,7 +83,7 @@ fun App(
                     enterTransition = { slideInHorizontally { it } },
                     popEnterTransition = { EnterTransition.None },
                     popExitTransition = { slideOutHorizontally { it } },
-                ) {
+                ) { entry ->
                     AuthenticatedContent(
                         authState = authState,
                         appViewModel = viewModel,
@@ -91,9 +91,9 @@ fun App(
                     ) { userSession ->
                         PersonalListsScreenRoute(
                             userSession = userSession,
-                            onBack = { navController.popBackStack() },
+                            onBack = { entry.ifResumed { navController.popBackStack() } },
                             onOpenList = { listId ->
-                                navController.navigate(Route.CheckList(listId))
+                                entry.ifResumed { navController.navigate(Route.CheckList(listId)) }
                             },
                         )
                     }
@@ -104,7 +104,7 @@ fun App(
                     enterTransition = { slideInHorizontally { it } },
                     popEnterTransition = { EnterTransition.None },
                     popExitTransition = { slideOutHorizontally { it } },
-                ) {
+                ) { entry ->
                     AuthenticatedContent(
                         authState = authState,
                         appViewModel = viewModel,
@@ -112,7 +112,7 @@ fun App(
                     ) { userSession ->
                         SharedListsScreen(
                             isGuest = userSession == null,
-                            onBack = { navController.popBackStack() },
+                            onBack = { entry.ifResumed { navController.popBackStack() } },
                         )
                     }
                 }
@@ -122,13 +122,13 @@ fun App(
                     enterTransition = { slideInHorizontally { it } },
                     popEnterTransition = { EnterTransition.None },
                     popExitTransition = { slideOutHorizontally { it } },
-                ) {
+                ) { entry ->
                     AuthenticatedContent(
                         authState = authState,
                         appViewModel = viewModel,
                         navController = navController,
                     ) { _ ->
-                        RecipesScreen(onBack = { navController.popBackStack() })
+                        RecipesScreen(onBack = { entry.ifResumed { navController.popBackStack() } })
                     }
                 }
 
@@ -137,13 +137,13 @@ fun App(
                     enterTransition = { slideInHorizontally { it } },
                     popEnterTransition = { EnterTransition.None },
                     popExitTransition = { slideOutHorizontally { it } },
-                ) {
+                ) { entry ->
                     AuthenticatedContent(
                         authState = authState,
                         appViewModel = viewModel,
                         navController = navController,
                     ) { _ ->
-                        ProfileScreen(onBack = { navController.popBackStack() })
+                        ProfileScreen(onBack = { entry.ifResumed { navController.popBackStack() } })
                     }
                 }
 
@@ -165,9 +165,11 @@ fun App(
                             listId = args.listId,
                             navController = navController,
                             onLogout = {
-                                viewModel.exitGuestMode()
-                                navController.navigate(Route.Login) {
-                                    popUpTo(Route.Dashboard) { inclusive = true }
+                                backStackEntry.ifResumed {
+                                    viewModel.exitGuestMode()
+                                    navController.navigate(Route.Login) {
+                                        popUpTo(Route.Dashboard) { inclusive = true }
+                                    }
                                 }
                             },
                         )
@@ -178,7 +180,7 @@ fun App(
                 composable<Route.Login>(
                     exitTransition = { slideOutHorizontally() },
                     popEnterTransition = { slideInHorizontally() },
-                ) {
+                ) { entry ->
                     LoginScreenRoute(
                         onLoginSuccess = {
                             navController.navigate(Route.Dashboard) {
@@ -186,7 +188,7 @@ fun App(
                             }
                         },
                         onForgotPassword = {
-                            navController.navigate(Route.ResetPasswordRequest)
+                            entry.ifResumed { navController.navigate(Route.ResetPasswordRequest) }
                         },
                     )
                 }
@@ -196,16 +198,18 @@ fun App(
                     enterTransition = { slideInHorizontally { it } },
                     popEnterTransition = { EnterTransition.None },
                     popExitTransition = { slideOutHorizontally { it } },
-                ) {
+                ) { entry ->
                     val loginViewModel = koinViewModel<LoginViewModel>()
                     ResetPasswordRequestScreen(
-                        onBack = { navController.popBackStack() },
+                        onBack = { entry.ifResumed { navController.popBackStack() } },
                         onBackToLogin = {
-                            navController.popBackStack(Route.Login, inclusive = false)
+                            entry.ifResumed { navController.popBackStack(Route.Login, inclusive = false) }
                         },
                         onSendResetLink = { email ->
-                            loginViewModel.resetPassword(email)
-                            navController.navigate(Route.ResetPasswordSent(email))
+                            entry.ifResumed {
+                                loginViewModel.resetPassword(email)
+                                navController.navigate(Route.ResetPasswordSent(email))
+                            }
                         },
                     )
                 }
@@ -219,13 +223,15 @@ fun App(
                     val loginViewModel = koinViewModel<LoginViewModel>()
                     ResetPasswordSentScreen(
                         email = args.email,
-                        onBack = { navController.popBackStack() },
+                        onBack = { backStackEntry.ifResumed { navController.popBackStack() } },
                         onContinue = {
-                            navController.navigate(Route.ResetPasswordCreate)
+                            backStackEntry.ifResumed { navController.navigate(Route.ResetPasswordCreate) }
                         },
                         onResend = { loginViewModel.resetPassword(args.email) },
                         onBackToLogin = {
-                            navController.popBackStack(Route.Login, inclusive = false)
+                            backStackEntry.ifResumed {
+                                navController.popBackStack(Route.Login, inclusive = false)
+                            }
                         },
                     )
                 }
@@ -234,14 +240,16 @@ fun App(
                     enterTransition = { slideInHorizontally { it } },
                     popEnterTransition = { EnterTransition.None },
                     popExitTransition = { slideOutHorizontally { it } },
-                ) {
+                ) { entry ->
                     val loginViewModel = koinViewModel<LoginViewModel>()
                     ResetPasswordCreateScreen(
-                        onBack = { navController.popBackStack() },
+                        onBack = { entry.ifResumed { navController.popBackStack() } },
                         onUpdatePassword = { newPassword ->
-                            loginViewModel.changePassword(newPassword)
-                            navController.navigate(Route.ResetPasswordSuccess) {
-                                popUpTo(Route.Login) { inclusive = false }
+                            entry.ifResumed {
+                                loginViewModel.changePassword(newPassword)
+                                navController.navigate(Route.ResetPasswordSuccess) {
+                                    popUpTo(Route.Login) { inclusive = false }
+                                }
                             }
                         },
                     )
@@ -249,10 +257,10 @@ fun App(
 
                 composable<Route.ResetPasswordSuccess>(
                     enterTransition = { slideInHorizontally { it } },
-                ) {
+                ) { entry ->
                     ResetPasswordSuccessScreen(
                         onBackToLogin = {
-                            navController.popBackStack(Route.Login, inclusive = false)
+                            entry.ifResumed { navController.popBackStack(Route.Login, inclusive = false) }
                         },
                     )
                 }

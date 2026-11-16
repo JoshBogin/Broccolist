@@ -39,6 +39,10 @@ fun AuthenticatedContent(
                     // post-auth start destination) so login replaces
                     // whatever screen redirected us.
                     popUpTo(Route.Dashboard) { inclusive = true }
+                    // State-driven, so not lifecycle-guarded (it must run
+                    // even mid-transition) — singleTop keeps a repeat
+                    // trigger from stacking a second Login.
+                    launchSingleTop = true
                 }
             }
         }
@@ -62,6 +66,7 @@ fun AuthenticatedContent(
                     appViewModel.signOutAndExit()
                     navController.navigate(Route.Login) {
                         popUpTo(Route.Dashboard) { inclusive = true }
+                        launchSingleTop = true
                     }
                 },
             )
