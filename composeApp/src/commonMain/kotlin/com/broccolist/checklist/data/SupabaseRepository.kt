@@ -29,4 +29,10 @@ interface SupabaseRepository {
     suspend fun removeItem(item: SectionItem)
     suspend fun updateItem(item: SectionItem)
     suspend fun addItemWithSection(item: SectionItem, section: Section)
+
+    /** Persist an item's new place: its section and its position within it. */
+    suspend fun moveItem(itemId: Int, sectionId: Int, position: Double)
+
+    /** Persist a section's new position within its list. */
+    suspend fun moveSection(sectionId: Int, position: Double)
 }

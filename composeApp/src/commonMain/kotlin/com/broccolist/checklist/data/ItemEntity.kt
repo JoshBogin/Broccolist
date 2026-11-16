@@ -11,4 +11,6 @@ data class ItemEntity(
     val isChecked: Boolean,
     @SerialName("section_id")
     val sectionId: Int? = null,
+    // Null is left out of the request body, so the column default applies.
+    val position: Double? = null,
 )

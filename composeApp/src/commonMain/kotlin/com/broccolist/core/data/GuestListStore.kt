@@ -36,6 +36,12 @@ interface GuestListStore {
     fun removeItem(listId: Int, sectionId: Int, itemId: Int)
     fun updateItem(listId: Int, item: SectionItem)
 
+    /** Guest counterpart of `SupabaseRepository.moveItem`. */
+    fun moveItem(listId: Int, itemId: Int, sectionId: Int, position: Double)
+
+    /** Guest counterpart of `SupabaseRepository.moveSection`. */
+    fun moveSection(listId: Int, sectionId: Int, position: Double)
+
     /** Clears all guest data; called on sign-out or after migration. */
     fun reset()
 }
@@ -171,6 +177,40 @@ internal class InMemoryGuestListStore : GuestListStore {
                             if (it.id == item.id) item else it
                         })
                     },
+                    editedAt = now(),
+                )
+            }
+        }
+    }
+
+    override fun moveItem(listId: Int, itemId: Int, sectionId: Int, position: Double) {
+        _lists.update { lists ->
+            lists.map { list ->
+                if (list.id != listId) return@map list
+                val item = list.sections
+                    .firstNotNullOfOrNull { section -> section.items?.firstOrNull { it.id == itemId } }
+                    ?: return@map list
+                val moved = item.copy(sectionId = sectionId, position = position)
+                list.copy(
+                    sections = list.sections.map { section ->
+                        val others = section.items.orEmpty().filter { it.id != itemId }
+                        val items = if (section.id == sectionId) others + moved else others
+                        section.copy(items = items.sortedBy { it.position })
+                    },
+                    editedAt = now(),
+                )
+            }
+        }
+    }
+
+    override fun moveSection(listId: Int, sectionId: Int, position: Double) {
+        _lists.update { lists ->
+            lists.map { list ->
+                if (list.id != listId) return@map list
+                list.copy(
+                    sections = list.sections
+                        .map { if (it.id == sectionId) it.copy(position = position) else it }
+                        .sortedBy { it.position },
                     editedAt = now(),
                 )
             }

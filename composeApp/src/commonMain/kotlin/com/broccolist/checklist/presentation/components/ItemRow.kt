@@ -64,6 +64,8 @@ internal fun ItemRow(
     swipeInCooldown: Boolean = false,
     isCurrentlyBeingSwiped: Boolean,
     onSwipeStateChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    dragHandle: @Composable () -> Unit,
 ) {
     val focusManager = LocalFocusManager.current
     val density = LocalDensity.current
@@ -117,7 +119,7 @@ internal fun ItemRow(
 
     Box(
         contentAlignment = Alignment.Center,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(56.dp),
     ) {
@@ -178,7 +180,7 @@ internal fun ItemRow(
                                 return@rememberDraggableState
                             }
                             focusManager.clearFocus()
-                            onSwipeStateChange(item.swipeKey)
+                            onSwipeStateChange(item.rowKey)
                             offsetX += delta
 
                             if (offsetX < fullDeleteThreshold) {
@@ -207,6 +209,10 @@ internal fun ItemRow(
                         },
                     ),
             ) {
+                // Vertical drags that start here reorder the row. The handle
+                // is a child of this Row, so it sees the gesture before the
+                // horizontal swipe-to-delete above does.
+                dragHandle()
                 // Always-rendered editable field. Looks identical to a
                 // static Text when unfocused (no border / cursor); pressing
                 // Done or tapping away commits whatever the user typed.
@@ -227,7 +233,8 @@ internal fun ItemRow(
                     interactionSource = interactionSource,
                     modifier = Modifier
                         .weight(1f)
-                        .padding(horizontal = 24.dp, vertical = 16.dp)
+                        .padding(end = 24.dp)
+                        .padding(vertical = 16.dp)
                         .onFocusChanged { state ->
                             // Lost focus (tapped away, scrolled, swiped)
                             // → commit any pending edit so it doesn't

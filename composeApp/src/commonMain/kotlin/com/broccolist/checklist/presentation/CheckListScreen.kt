@@ -19,10 +19,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
@@ -76,13 +74,33 @@ import broccolist.composeapp.generated.resources.home
 import broccolist.composeapp.generated.resources.item
 import broccolist.composeapp.generated.resources.section
 import broccolist.composeapp.generated.resources.sign_out
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import com.broccolist.checklist.presentation.components.ChecklistRow
+import com.broccolist.checklist.presentation.components.DragHandle
+import com.broccolist.checklist.presentation.components.ItemRow
+import com.broccolist.checklist.presentation.components.PlaceholderItemRow
+import com.broccolist.checklist.presentation.components.SwipeableBox
+import com.broccolist.checklist.presentation.components.buildChecklistRows
+import com.broccolist.checklist.presentation.components.resolveItemDrop
+import com.broccolist.checklist.presentation.components.resolveSectionDrop
+import com.broccolist.checklist.presentation.components.rowKey
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import com.broccolist.app.data.Route
 import com.broccolist.checklist.domain.GrocerySection
 import com.broccolist.checklist.domain.Section
 import com.broccolist.checklist.domain.SectionItem
 import com.broccolist.checklist.domain.has
 import com.broccolist.checklist.presentation.components.ItemInserter
-import com.broccolist.checklist.presentation.components.ItemSection
 import com.broccolist.checklist.presentation.components.SectionSelector
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -117,6 +135,9 @@ fun CheckListScreenRoute(
         addItemToSection = viewModel::addItemToSection,
         removeItemFromSection = viewModel::removeItemFromSection,
         updateItem = viewModel::updateItem,
+        moveItem = viewModel::moveItem,
+        moveSection = viewModel::moveSection,
+        commitReorder = viewModel::commitReorder,
         signOut = viewModel::signOut,
         onLogout = onLogout
     )
@@ -133,11 +154,16 @@ fun CheckListScreen(
     addItemToSection: (Section, SectionItem) -> Unit,
     removeItemFromSection: (Section, SectionItem) -> Unit,
     updateItem: (SectionItem) -> Unit,
+    moveItem: (itemId: Int, toSectionId: Int, toIndex: Int) -> Unit,
+    moveSection: (sectionId: Int, toIndex: Int) -> Unit,
+    commitReorder: () -> Unit,
     signOut: () -> Unit,
     onLogout: () -> Unit,
 ) {
     val focusManager = LocalFocusManager.current
-    val scrollState = rememberScrollState()
+    val lazyListState = rememberLazyListState()
+    val haptic = LocalHapticFeedback.current
+    val itemHeightPx = with(LocalDensity.current) { 56.dp.toPx() }
     val drawerState: DrawerState = rememberDrawerState(DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
     var swipeInCooldown by remember { mutableStateOf(false) }
@@ -146,7 +172,43 @@ fun CheckListScreen(
     var showItemInserter by remember { mutableStateOf(false) }
     val colorScheme = MaterialTheme.colorScheme
 
-    println("CheckListScreen: listId=${listId}, sections=${sections}")
+    // Row keys of the sections the user has collapsed.
+    var collapsedKeys by remember { mutableStateOf(emptySet<String>()) }
+    var draggingItemKey by remember { mutableStateOf<String?>(null) }
+    var sectionDragRequested by remember { mutableStateOf(false) }
+
+    // Updated on every move so the reorder callback always reads the rows
+    // that are actually on screen.
+    var currentRows by remember { mutableStateOf(emptyList<ChecklistRow>()) }
+    val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
+        if (sectionDragRequested) {
+            resolveSectionDrop(currentRows, from.key, to.key)
+                ?.let { moveSection(it.sectionId, it.index) }
+        } else {
+            resolveItemDrop(currentRows, from.key, to.key)
+                ?.let { moveItem(it.itemId, it.sectionId, it.index) }
+        }
+        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+    }
+
+    // While a section is in the air every section folds down to its header,
+    // so the whole list fits on screen for rearranging. The fold waits until
+    // the library has picked the header up: it records the row's starting
+    // offset at that point, and folding earlier would move the row out from
+    // under the finger.
+    val collapseAll = sectionDragRequested && reorderableState.isAnyItemDragging
+    val rows = remember(sections, collapsedKeys, collapseAll, draggingItemKey) {
+        buildChecklistRows(sections, collapsedKeys, collapseAll, draggingItemKey)
+    }
+    currentRows = rows
+
+    val onSwipe: () -> Unit = {
+        swipeInCooldown = true
+        coroutineScope.launch {
+            delay(500) // 500ms cooldown
+            swipeInCooldown = false
+        }
+    }
 
     ModalNavigationDrawer(
         drawerContent = {
@@ -434,39 +496,136 @@ fun CheckListScreen(
                     interactionSource = null,
                 )
         ) { contentPadding ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(
-                        state = scrollState,
-                    )
-                    .padding(contentPadding),
-                horizontalAlignment = Alignment.CenterHorizontally
+            LazyColumn(
+                state = lazyListState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    top = contentPadding.calculateTopPadding(),
+                    // Room for the FAB so it never covers the last row.
+                    bottom = contentPadding.calculateBottomPadding() + 72.dp,
+                ),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                val lastIndex = sections.size - 1
-                sections.forEachIndexed { index, section ->
-                    ItemSection(
-                        removeSection = removeSection,
-                        onUpdateSection = updateSection,
-                        addItemToSection = addItemToSection,
-                        removeItemFromSection = removeItemFromSection,
-                        updateItem = updateItem,
-                        section = section,
-                        onSwipe = {
-                            swipeInCooldown = true
-                            coroutineScope.launch {
-                                delay(500) // 500ms cooldown
-                                swipeInCooldown = false
+                items(rows, key = { it.key }, contentType = { it::class }) { row ->
+                    when (row) {
+                        is ChecklistRow.Header -> ReorderableItem(reorderableState, key = row.key) { isDragging ->
+                            val canDrag = row.section.id != null
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .shadow(if (isDragging) 8.dp else 0.dp)
+                                    .background(colorScheme.background),
+                            ) {
+                                HorizontalDivider(color = colorScheme.primary, thickness = 1.dp)
+                                SwipeableBox(
+                                    removeSection = removeSection,
+                                    colorScheme = colorScheme,
+                                    showItems = row.expanded,
+                                    onClick = {
+                                        collapsedKeys = if (row.key in collapsedKeys) {
+                                            collapsedKeys - row.key
+                                        } else {
+                                            collapsedKeys + row.key
+                                        }
+                                    },
+                                    section = row.section,
+                                    onUpdateSection = updateSection,
+                                    onDeleteSwipe = onSwipe,
+                                    swipeInCooldown = swipeInCooldown,
+                                    isCurrentlyBeingSwiped = currentlySwipedId == row.key,
+                                    onSwipeStateChange = { currentlySwipedId = it },
+                                    dragHandle = {
+                                        DragHandle(
+                                            enabled = canDrag,
+                                            modifier = Modifier.draggableHandle(
+                                                enabled = canDrag,
+                                                onDragStarted = {
+                                                    focusManager.clearFocus()
+                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                    sectionDragRequested = true
+                                                },
+                                                onDragStopped = {
+                                                    sectionDragRequested = false
+                                                    commitReorder()
+                                                },
+                                            ),
+                                        )
+                                    },
+                                )
+                                HorizontalDivider(color = colorScheme.primary, thickness = 1.dp)
                             }
-                        },
-                        swipeInCooldown = swipeInCooldown,
-                        currentlySwipedId = currentlySwipedId,
-                        onSwipeStateChange = { id ->
-                            currentlySwipedId = id
-                        },
-                        scrollState = scrollState,
-                        isLastSection = index == lastIndex,
-                    )
+                        }
+
+                        is ChecklistRow.Item -> ReorderableItem(reorderableState, key = row.key) { isDragging ->
+                            val canDrag = row.item.id != null
+                            ItemRow(
+                                item = row.item,
+                                color = if (row.indexInSection % 2 == 1) {
+                                    colorScheme.secondaryContainer
+                                } else {
+                                    colorScheme.background
+                                },
+                                updateItem = updateItem,
+                                removeItem = { item -> removeItemFromSection(row.section, item) },
+                                onDeleteSwipe = onSwipe,
+                                swipeInCooldown = swipeInCooldown,
+                                isCurrentlyBeingSwiped = currentlySwipedId == row.key,
+                                onSwipeStateChange = { currentlySwipedId = it },
+                                modifier = Modifier.shadow(if (isDragging) 8.dp else 0.dp),
+                                dragHandle = {
+                                    DragHandle(
+                                        enabled = canDrag,
+                                        modifier = Modifier.draggableHandle(
+                                            enabled = canDrag,
+                                            onDragStarted = {
+                                                focusManager.clearFocus()
+                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                draggingItemKey = row.key
+                                            },
+                                            onDragStopped = {
+                                                // If the item was dropped into a collapsed
+                                                // section, open it so the user can see
+                                                // where it went.
+                                                currentRows
+                                                    .firstOrNull { it.key == draggingItemKey }
+                                                    ?.let { it as? ChecklistRow.Item }
+                                                    ?.let { collapsedKeys = collapsedKeys - it.section.rowKey }
+                                                draggingItemKey = null
+                                                commitReorder()
+                                            },
+                                        ),
+                                    )
+                                },
+                            )
+                        }
+
+                        is ChecklistRow.AddItem -> Box(modifier = Modifier.animateItem()) {
+                            val focusRequester = remember { FocusRequester() }
+                            PlaceholderItemRow(
+                                focusRequester = focusRequester,
+                                onAddItem = { newItemName ->
+                                    addItemToSection(
+                                        row.section,
+                                        SectionItem(
+                                            name = newItemName,
+                                            isChecked = false,
+                                            sectionId = row.section.id,
+                                        ),
+                                    )
+                                    // Keep the "Add Item" field in view as the
+                                    // new row pushes it down.
+                                    coroutineScope.launch {
+                                        lazyListState.animateScrollBy(itemHeightPx)
+                                    }
+                                },
+                                color = if (row.section.items.orEmpty().size % 2 == 1) {
+                                    colorScheme.secondaryContainer
+                                } else {
+                                    colorScheme.background
+                                },
+                            )
+                        }
+                    }
                 }
             }
 
@@ -647,6 +806,9 @@ fun CheckListScreenPreview() {
             addItemToSection = { _, _ -> },
             removeItemFromSection = { _, _ -> },
             updateItem = { },
+            moveItem = { _, _, _ -> },
+            moveSection = { _, _ -> },
+            commitReorder = { },
         )
     }
 }
@@ -718,6 +880,9 @@ fun CheckListScreenDarkPreview() {
             addItemToSection = { _, _ -> },
             removeItemFromSection = { _, _ -> },
             updateItem = { },
+            moveItem = { _, _, _ -> },
+            moveSection = { _, _ -> },
+            commitReorder = { },
         )
     }
 }

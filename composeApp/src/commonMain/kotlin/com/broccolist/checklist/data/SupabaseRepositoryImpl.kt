@@ -7,6 +7,7 @@ import com.broccolist.checklist.domain.SectionItem
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Order
+import io.github.jan.supabase.postgrest.query.PostgrestRequestBuilder
 import kotlinx.datetime.Clock
 
 class SupabaseRepositoryImpl(
@@ -23,6 +24,7 @@ class SupabaseRepositoryImpl(
             // get real item counts without an N+1 fan-out.
             val sectionEntities = client.from("sections").select {
                 filter { SectionEntity::listId isIn listIds }
+                byPosition()
             }.decodeList<SectionEntity>()
 
             val sectionIds = sectionEntities.mapNotNull { it.id }
@@ -31,6 +33,7 @@ class SupabaseRepositoryImpl(
             } else {
                 client.from("items").select {
                     filter { ItemEntity::sectionId isIn sectionIds }
+                    byPosition()
                 }.decodeList<ItemEntity>().groupBy { it.sectionId }
             }
 
@@ -41,6 +44,7 @@ class SupabaseRepositoryImpl(
                         section = GrocerySection.fromString(entity.name),
                         items = itemsBySection[entity.id].orEmpty().map { it.toDomain() },
                         listId = entity.listId,
+                        position = entity.position ?: 0.0,
                     )
                 }
             }
@@ -66,7 +70,14 @@ class SupabaseRepositoryImpl(
         name = name,
         isChecked = isChecked,
         sectionId = sectionId,
+        position = position ?: 0.0,
     )
+
+    /** Display order: by position, with id as a stable tie-break. */
+    private fun PostgrestRequestBuilder.byPosition() {
+        order("position", Order.ASCENDING)
+        order("id", Order.ASCENDING)
+    }
 
     override suspend fun getListById(listId: Int): CheckList? {
         return try {
@@ -146,12 +157,14 @@ class SupabaseRepositoryImpl(
                 filter {
                     SectionEntity::listId eq listId
                 }
+                byPosition()
             }.decodeList<SectionEntity>().map { entity ->
                 Section(
                     id = entity.id,
                     section = GrocerySection.fromString(entity.name),
                     items = getItems(entity.id ?: 0),
-                    listId = entity.listId
+                    listId = entity.listId,
+                    position = entity.position ?: 0.0,
                 )
             }
         } catch (e: Exception) {
@@ -166,14 +179,8 @@ class SupabaseRepositoryImpl(
                 filter {
                     ItemEntity::sectionId eq sectionId
                 }
-            }.decodeList<ItemEntity>().map { entity ->
-                SectionItem(
-                    id = entity.id,
-                    name = entity.name,
-                    isChecked = entity.isChecked,
-                    sectionId = entity.sectionId
-                )
-            }
+                byPosition()
+            }.decodeList<ItemEntity>().map { it.toDomain() }
         } catch (e: Exception) {
             e.printStackTrace()
             emptyList()
@@ -186,6 +193,7 @@ class SupabaseRepositoryImpl(
                 SectionEntity(
                     name = section.section.displayName,
                     listId = section.listId,
+                    position = section.position,
                 )
             ) {
                 select()
@@ -194,7 +202,8 @@ class SupabaseRepositoryImpl(
                     id = entity.id,
                     section = section.section,
                     items = emptyList(),
-                    listId = entity.listId
+                    listId = entity.listId,
+                    position = entity.position ?: section.position,
                 )
             }
         } catch (e: Exception) {
@@ -237,18 +246,12 @@ class SupabaseRepositoryImpl(
                 ItemEntity(
                     name = item.name,
                     isChecked = item.isChecked,
-                    sectionId = item.sectionId
+                    sectionId = item.sectionId,
+                    position = item.position,
                 )
             ) {
                 select()
-            }.decodeSingle<ItemEntity>().let { entity ->
-                SectionItem(
-                    id = entity.id,
-                    name = entity.name,
-                    isChecked = entity.isChecked,
-                    sectionId = entity.sectionId
-                )
-            }
+            }.decodeSingle<ItemEntity>().toDomain()
         } catch (e: Exception) {
             e.printStackTrace()
             null
@@ -289,7 +292,8 @@ class SupabaseRepositoryImpl(
             .insert(
                 SectionEntity(
                     name = section.section.displayName,
-                    listId = section.listId
+                    listId = section.listId,
+                    position = section.position,
                 )
             ) {
                 select()
@@ -299,8 +303,38 @@ class SupabaseRepositoryImpl(
             ItemEntity(
                 name = item.name,
                 isChecked = item.isChecked,
-                sectionId = insertedSection.id ?: 0
+                sectionId = insertedSection.id ?: 0,
+                position = item.position,
             )
         )
+    }
+
+    override suspend fun moveItem(itemId: Int, sectionId: Int, position: Double) {
+        try {
+            client.from("items").update(
+                {
+                    ItemEntity::sectionId setTo sectionId
+                    ItemEntity::position setTo position
+                }
+            ) {
+                filter { ItemEntity::id eq itemId }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    override suspend fun moveSection(sectionId: Int, position: Double) {
+        try {
+            client.from("sections").update(
+                {
+                    SectionEntity::position setTo position
+                }
+            ) {
+                filter { SectionEntity::id eq sectionId }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 }

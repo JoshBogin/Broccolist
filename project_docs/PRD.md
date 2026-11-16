@@ -26,7 +26,7 @@ Dashboard + multi-list support landed. What shipped:
 
 ### Phase 1 deferred (not in this session)
 
-- **Drag-and-drop reordering** of items within and across sections — still queued for Phase 2 per the original roadmap.
+- **Drag-and-drop reordering — DONE in Phase 2.** Items reorder within a section and move across sections; sections reorder within the list (all sections fold to headers while one is dragged). Drags start from a handle on each row rather than the PRD's original long-press, to stay clear of tap-to-rename and swipe-to-delete. Order is a fractional `position double precision` on `sections` and `items` (midpoint on move, renumber when crowded), which settles the integer-vs-lexorank open question in favour of neither. Migration: `project_docs/migrations/001_positions.sql`. Not done: rollback/retry when a position write fails, and Realtime sync of order (Phase 3/4).
 - **Hamburger drawer content.** The dashboard's hamburger button currently routes to the Profile screen as a stub. A proper side drawer (Sign out, links to Personal/Shared/Recipes, theme toggle, etc.) is a Phase 2 polish item.
 - **Avatar stack on the Shared Lists tile.** The design shows overlapping member avatars on the Shared Lists card; that's blocked on Phase 4's friends/profiles tables. Today the tile just shows count 0.
 - **Friend-system Phase 4 dependencies.** Shared Lists is still a placeholder. The `profiles` / `friend_requests` / `friendships` / `list_members` tables haven't been created; that's all Phase 4.
@@ -121,7 +121,7 @@ Broccolist is a Kotlin Multiplatform grocery list app for Android and iOS. The c
 ### 2.3 Known Limitations (the things this PRD fixes)
 
 - **Items cannot be renamed inline** — `updateItem` exists in the repository but only handles `isChecked`/`name` round-trips; the UI has no edit affordance. Users currently delete and re-add to rename.
-- **Items cannot be reordered or moved between sections** — no `position`/`order` column anywhere.
+- ~~Items cannot be reordered or moved between sections~~ — resolved in Phase 2 (fractional `position` column + drag-and-drop).
 - **Only one list per user** — `getCheckList` returns `lists.firstOrNull()` and auto-creates if none exist. No multi-list support.
 - **No sharing, no friends, no recipes.**
 - **No offline support** — every read/write goes straight to Postgrest. `_checkLists` is in-memory only; restart = full reload. (Same applies to guest mode — local data does not survive an app kill.)
@@ -269,6 +269,8 @@ This requires a new `position: Int` column on both `sections` and `items`. On re
 
 Drag-and-drop is **list-scoped only** — users cannot drag items between different lists in this phase.
 
+**Potential follow-up — drop-target highlight.** While an item is being dragged, outline or tint the section it would land in (similar to the drop-zone box that appears when dragging a file onto a web page), so the drop bounds are obvious before release. Not part of the initial Phase 2 scope; revisit once the base drag-and-drop has shipped.
+
 ### 4.6 Friends & invites
 
 A new **Profile** screen surfaces the user's friend list and pending invites.
@@ -415,7 +417,7 @@ These need to be answered before or during implementation:
 - **Realtime transport at scale:** `postgres_changes` checks RLS for each change against each subscriber. If concurrent shared-list usage grows, switch to Broadcast-from-database triggers. Not needed at launch.
 - **Recipe parsing backend:** LLM-via-edge-function vs deterministic parser vs both? Likely both — deterministic first pass, LLM fallback for ambiguous input.
 - **Push notifications:** in-scope for friends invites, or in-app only for v1? Current plan is in-app only.
-- **Item position storage:** integer with periodic rebalancing, or `lexorank`-style strings? Integer is simpler; lexorank scales better.
+- ~~Item position storage~~ — decided in Phase 2: fractional `double precision` with midpoint insertion and renumbering when a gap runs out.
 - **Guest identifier:** stable per-install UUID stored in shared prefs / `NSUserDefaults`, or a fixed sentinel string? Per-install UUID is safer if a device ever hosts multiple guest users in sequence, but it complicates the migration query.
 - **Guest data on sign-out:** when an authenticated user signs out, do we surface a "stay signed in as guest with your data?" prompt, or wipe the local DB? Default proposal: wipe, since the data is tied to a real account that will sync back on next sign-in.
 

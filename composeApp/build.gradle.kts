@@ -77,6 +77,12 @@ kotlin {
             implementation(libs.realtime.kt)
             implementation(libs.compose.auth)
             implementation(libs.compose.auth.ui)
+
+            implementation(libs.reorderable)
+        }
+
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
         }
 
         iosMain.dependencies {

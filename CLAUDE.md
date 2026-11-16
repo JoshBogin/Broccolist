@@ -24,7 +24,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ./gradlew clean
 ```
 
-> Note: There are currently no unit test files in the project; test tasks exist but are unused.
+> Unit tests live in `composeApp/src/commonTest` (pure-Kotlin ordering and row-mapping logic so far) and run with `./gradlew testDebugUnitTest`.
 
 ## Architecture
 
@@ -69,7 +69,7 @@ ViewModels extend `androidx.lifecycle.ViewModel` and use `MutableStateFlow` + `v
 
 - **Auth**: Email/password (with verification + reset deep link), Google (native on Android via Credential Manager + `credentials-play-services-auth`; iOS uses Supabase's OAuth web fallback), guest mode (in-memory, gates shared features). Apple is hidden in UI until a developer account is available. Flow type is platform-specific: `FlowType.PKCE` on Android, `FlowType.IMPLICIT` on iOS (supabase-kt 3.0.3 limitation — external Safari can kill the app and lose the PKCE verifier; tokens-in-fragment is robust to that). Deep link scheme: `io.supabase.broccolist://login-callback`.
 - **Client key**: a **publishable key** (`sb_publishable_...`). RLS is enforced — every table (`lists`, `sections`, `items`) has policies scoped to `auth.uid() = user_id` via the parent traversal. Never embed a `service_role` key.
-- **Database**: Postgrest for CRUD on `lists`, `sections`, and `items` tables. Entities are `@Serializable` and decoded automatically.
+- **Database**: Postgrest for CRUD on `lists`, `sections`, and `items` tables. `sections` and `items` are ordered by a fractional `position` column (see Drag-and-drop ordering). Entities are `@Serializable` and decoded automatically.
 - **Realtime**: Installed but not yet fully wired up.
 
 `CheckListViewModel` uses **optimistic updates** — local state is updated immediately before the DB call. Items without a DB id are compared via custom `checkEqualityWithNullId()` helpers to prevent duplicates. In guest mode, the same ViewModel short-circuits Supabase calls and assigns negative integer IDs locally.
@@ -132,6 +132,16 @@ Two different patterns by design:
 - **Sections still rename via swipe → edit-icon → dialog** (the existing `SwipeableBox` behavior). Inline rename was scoped to items only.
 - **Section delete is always confirmation-gated.** All three entry points in `SwipeableBox` (tapping the red swipe button, full-swipe past `fullDeleteThreshold` mid-drag, releasing past `deleteThreshold`) flip a `showDeleteConfirmation` flag that opens an `AlertDialog`. Confirm calls `removeSection`; Cancel resets the row offset. Item delete still removes immediately on swipe — sections are heavier and contain other rows, so the extra friction is intentional there.
 
+### Drag-and-drop ordering (Phase 2)
+
+- **Storage.** `sections.position` and `items.position` are `double precision`. Rows are read `order by position, id`. A moved row takes the midpoint of its new neighbours (`Positioning.between`), so a drop is normally a single-row `PATCH`; when neighbours are closer than `Positioning.MIN_GAP` (or tied) the whole container is renumbered 1, 2, 3… New rows append at `max + 1`. The pure logic is in `checklist/domain/Positioning.kt` (`withItemMoved`, `withSectionMoved`). Schema changes are kept as SQL in `project_docs/migrations/` and applied by hand in the Supabase SQL editor.
+- **Flat list.** `CheckListScreen` is one `LazyColumn` over `ChecklistRow`s (`Header` / `Item` / `AddItem`, built by `buildChecklistRows` in `components/ChecklistRows.kt`), reordered with `sh.calvin.reorderable`. Flattening is what lets an item be dragged straight into another section: `resolveItemDrop` puts it in the section whose header is nearest above it. Only headers and items are wrapped in `ReorderableItem`, so only they are move targets.
+- **Gesture.** Drags start from a `DragHandle` at the left of each item row and section header (`draggableHandle`), never from the row itself — that keeps reordering out of the tap-to-rename / swipe-to-delete gesture space. Rows that are still being saved (`id == null`) can't be dragged.
+- **Section drag collapses everything.** While a header is in the air, `buildChecklistRows(collapseAll = true)` shows headers only; the user's own collapsed set comes back on drop. The collapse is gated on `reorderableState.isAnyItemDragging`, not on `onDragStarted`: the library records the row's starting offset when it picks it up, and collapsing earlier moves the row out from under the finger.
+- **Dragged item in a collapsed section.** The dragged item stays in the row list even inside a collapsed section (a row that leaves the list ends the drag); dropping there appends it and expands the section.
+- **Persistence.** `CheckListViewModel.moveItem` / `moveSection` only touch local state during the drag. `commitReorder()` (called on drop) diffs against a snapshot taken at the first move and writes just the rows whose position or section changed — to `SupabaseRepository.moveItem/moveSection`, or `GuestListStore` for guests.
+- **Row keys.** `Section.rowKey` / `SectionItem.rowKey` prefer a client-only `clientKey` assigned when a row is created on-device, then the id. That keeps the LazyColumn key stable when an optimistic row's insert returns and its id flips from null, so focus and an in-progress edit survive. Guest rows don't get a client key; `GuestListStore` assigns all guest ids from one session-wide counter.
+
 ### Current phase
 
-Phase 0 (auth polish) is complete. Phase 1 (Dashboard + multi-list + inline rename) hasn't started. See `project_docs/PRD.md` for the full roadmap and rationale.
+Phases 0 and 1 are complete. Phase 2 (drag-and-drop ordering) is implemented; Phase 3 (offline-first) is next. See `project_docs/PRD.md` for the full roadmap and rationale.

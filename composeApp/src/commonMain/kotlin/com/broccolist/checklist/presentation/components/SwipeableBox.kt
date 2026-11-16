@@ -67,6 +67,7 @@ internal fun SwipeableBox(
     swipeInCooldown: Boolean = false,
     isCurrentlyBeingSwiped: Boolean,
     onSwipeStateChange: (String) -> Unit,
+    dragHandle: @Composable () -> Unit,
 ) {
     val focusManager = LocalFocusManager.current
     val density = LocalDensity.current
@@ -178,7 +179,7 @@ internal fun SwipeableBox(
                             // Clear focus when swiping
                             focusManager.clearFocus()
                             // Notify parent that this section is being swiped
-                            onSwipeStateChange(section.swipeKey)
+                            onSwipeStateChange(section.rowKey)
                             offsetX += delta
 
                             // Past the full-delete threshold — ask for
@@ -214,6 +215,9 @@ internal fun SwipeableBox(
                         }
                     ),
             ) {
+                Box(modifier = Modifier.align(Alignment.CenterStart)) {
+                    dragHandle()
+                }
                 Text(
                     text = section.section.displayName,
                     fontSize = 18.sp,

@@ -20,5 +20,6 @@
     <string name="cd_delete_icon">Delete</string>
     <string name="cd_chevron_icon">Chevron Icon</string>
     <string name="cd_edit_icon">Edit Icon</string>
+    <string name="cd_drag_handle">Drag to reorder</string>
 
 </resources>

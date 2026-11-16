@@ -9,4 +9,5 @@ data class SectionEntity(
     val name: String,
     @SerialName("list_id")
     val listId: Int,
+    val position: Double? = null,
 )
