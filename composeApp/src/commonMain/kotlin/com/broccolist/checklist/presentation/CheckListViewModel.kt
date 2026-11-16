@@ -7,10 +7,10 @@ import com.broccolist.checklist.domain.CheckList
 import com.broccolist.checklist.domain.Section
 import com.broccolist.checklist.domain.SectionItem
 import com.broccolist.checklist.domain.has
+import com.broccolist.core.data.GuestListStore
 import com.broccolist.core.data.GuestModeRepository
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
-import io.github.jan.supabase.auth.user.UserSession
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -20,35 +20,30 @@ class CheckListViewModel(
     private val supabaseClient: SupabaseClient,
     private val supabaseRepository: SupabaseRepository,
     private val guestModeRepository: GuestModeRepository,
+    private val guestListStore: GuestListStore,
 ) : ViewModel() {
     private val _checkLists = MutableStateFlow<CheckList?>(null)
     val checkLists = _checkLists.asStateFlow()
+
+    /** The id of the list currently bound to this ViewModel. */
+    private var listId: Int = 0
 
     /** True when the current data set is local-only (guest mode). */
     private val isGuest: Boolean get() = guestModeRepository.isGuest.value
 
     /**
-     * Load the user's list. Pass `null` for guest mode — we hand back an
-     * empty in-memory list. Phase 3 will replace this with SQLDelight-backed
-     * storage and an explicit migration step when the guest upgrades.
+     * Load a specific list by id. Guests pull from [GuestListStore]; signed-in
+     * users fetch the list (including sections + items) from Supabase. Called
+     * once on screen entry from [CheckListScreenRoute].
      */
-    fun getList(userSession: UserSession?) {
-        if (userSession == null || isGuest) {
-            // In-memory only for guests. Seed with an empty list so the UI has
-            // something to render.
-            if (_checkLists.value == null) {
-                _checkLists.value = CheckList(
-                    id = GUEST_LIST_ID,
-                    name = "My List",
-                    sections = emptyList(),
-                    userId = GUEST_USER_ID,
-                )
-            }
+    fun loadList(listId: Int) {
+        this.listId = listId
+        if (isGuest) {
+            _checkLists.value = guestListStore.getListById(listId)
             return
         }
         viewModelScope.launch {
-            val userId = userSession.user?.id ?: ""
-            _checkLists.value = supabaseRepository.getCheckList(userId)
+            _checkLists.value = supabaseRepository.getListById(listId)
         }
     }
 
@@ -61,7 +56,11 @@ class CheckListViewModel(
             section
         }
         upsertLocalSection(localSection)
-        if (isGuest) return
+        if (isGuest) {
+            // Mirror to the store so the dashboard's counts/preview update.
+            guestListStore.upsertSection(listId, localSection)
+            return
+        }
 
         viewModelScope.launch {
             val newSection = supabaseRepository.addSection(section) ?: return@launch
@@ -101,7 +100,10 @@ class CheckListViewModel(
                 sections = currentSections
             )
         }
-        if (isGuest) return
+        if (isGuest) {
+            guestListStore.removeSection(listId, section.id)
+            return
+        }
 
         // Remove the section from the database
         viewModelScope.launch {
@@ -122,7 +124,10 @@ class CheckListViewModel(
                 )
             }
         }
-        if (isGuest) return
+        if (isGuest) {
+            guestListStore.updateSection(listId, section)
+            return
+        }
 
         // Update the section in the database
         viewModelScope.launch {
@@ -136,11 +141,13 @@ class CheckListViewModel(
             // Guest path: assign a local id, ensure the section exists locally,
             // and insert the item. No network round-trip.
             val resolvedSection = section.id?.let { section } ?: section.copy(id = nextLocalId())
+            val storedSection = guestListStore.upsertSection(listId, resolvedSection)
             val localItem = item.copy(
                 id = nextLocalId(),
-                sectionId = resolvedSection.id,
+                sectionId = storedSection.id,
             )
-            upsertLocalItem(resolvedSection, localItem)
+            val storedItem = guestListStore.upsertItem(listId, storedSection.id ?: 0, localItem)
+            upsertLocalItem(storedSection, storedItem)
             return
         }
 
@@ -232,7 +239,10 @@ class CheckListViewModel(
                 )
             }
         }
-        if (isGuest) return
+        if (isGuest) {
+            guestListStore.removeItem(listId, section.id, item.id)
+            return
+        }
 
         // Remove the item from the database
         viewModelScope.launch {
@@ -258,7 +268,10 @@ class CheckListViewModel(
                 }
             }
         }
-        if (isGuest) return
+        if (isGuest) {
+            guestListStore.updateItem(listId, item)
+            return
+        }
 
         // Update the item in the database
         viewModelScope.launch {
@@ -271,6 +284,7 @@ class CheckListViewModel(
         // also clear the local SQLDelight DB (or migrate it to the account
         // the user is signing into, depending on flow).
         if (isGuest) {
+            guestListStore.reset()
             guestModeRepository.exitGuestMode()
             _checkLists.value = null
             return
@@ -288,14 +302,8 @@ class CheckListViewModel(
     /**
      * Hand-rolled local ID generator for guest-mode sections and items. Uses
      * negative numbers so they're easy to distinguish from server-assigned
-     * positive IDs if/when we migrate. Will be replaced by SQLDelight
-     * auto-increment in Phase 3.
+     * positive IDs. Will be replaced by SQLDelight auto-increment in Phase 3.
      */
     private var localIdCounter: Int = -1
     private fun nextLocalId(): Int = localIdCounter--
-
-    private companion object {
-        const val GUEST_USER_ID = "guest"
-        const val GUEST_LIST_ID = -1
-    }
 }

@@ -1,8 +1,35 @@
 # Broccolist — Product Requirements Document
 
-**Status:** Phase 0 complete; Phase 1 not yet started.
-**Last updated:** 2026-06-05
+**Status:** Phase 0 complete; Phase 1 in progress (dashboard + multi-list scaffolding shipped; inline rename shipped).
+**Last updated:** 2026-06-12
 **Owner:** Josh Bogin
+
+## Phase 1 progress (this session)
+
+Dashboard + multi-list support landed. What shipped:
+
+- **`material-icons-extended` artifact added** to `commonMain` so the dashboard can use `Outlined.Group`, `Outlined.RestaurantMenu`, etc. Adds ~2 MB but unlocks the design's icons without odd substitutions.
+- **Routes restructured.** `Route.Dashboard` is the new post-auth start destination. `Route.CheckList` is now `data class CheckList(val listId: Int)`. Added `Route.PersonalLists`, `Route.SharedLists`, `Route.Recipes`, `Route.Profile`.
+- **Multi-list data layer.** `SupabaseRepository` gained `getListsForUser`, `getListById`, `createList(name, userId)`, `renameList(listId, name)`, `deleteList(listId)`. The auto-create-on-first-load behavior in `getCheckList` is gone — new users land on the Personal Lists screen with an empty state and explicitly create their first list.
+- **New `GuestListStore`.** In-memory store backing guest-mode lists with full CRUD (sections, items, lists). Replaces the previous "single seeded list" pattern in `CheckListViewModel`. Hand-rolled negative-int IDs keep guest rows visually distinct from server-assigned IDs (useful for the Phase-3 migration code).
+- **DashboardScreen + DashboardViewModel.** Top bar (hamburger / logo / profile avatar), greeting "Good {timeOfDay}, {name}", hero "What are we shopping for?", three tiles (Personal Lists, Shared Lists, Recipes) with count badges and chevrons, and a "JUMP BACK IN" section showing up to 3 most-recently-edited lists with progress bars (checked/total items). Tiles open their respective screens.
+- **PersonalListsScreen + ViewModel.** Lists rendered as cards in a `LazyColumn`. Tap row → opens that list. Kebab menu → Rename / Delete (each opens a dialog). FAB → Create-list dialog. Empty state when no lists exist. Both authenticated and guest paths wired.
+- **Shared Lists / Recipes / Profile placeholder screens.** Top bar with back arrow, centered icon-badge, "Coming soon" copy. Shared Lists swaps to a "Sign up to share lists with friends" upsell when in guest mode.
+- **`CheckListScreen` is now listId-aware.** `CheckListScreenRoute` takes `listId: Int` and calls `viewModel.loadList(listId)`. The drawer's "Home" button now navigates to `Route.Dashboard` (was the now-removed bare `Route.CheckList`).
+- **Nav graph rebuilt in `App.kt`.** Dashboard as start destination; every Phase-1 screen wrapped in `AuthenticatedContent` so the guest/auth/initializing branches stay consistent. Slide-in-from-right enter transitions with explicit `popEnterTransition = EnterTransition.None` to keep popped-to screens still while the current slides off.
+- **DI updates.** `DashboardViewModel`, `PersonalListsViewModel`, and `GuestListStore` registered in `sharedModule` / `dataModule`.
+
+### Phase 1 polish (this session)
+
+- **Inline rename for items — DONE.** `ItemRow` always renders a `BasicTextField` (never swaps between Text and TextField). Unfocused, the field looks like plain text — no border, no cursor. Tap focuses it and the keyboard appears; pressing Done commits and dismisses, or blur (tapping the checkbox, swiping, scrolling away) commits via `onFocusChanged`. Empty / whitespace-only entries revert. Swipe-to-delete is gated on `!isFocused` so cursor / selection drags work while editing. External name changes (e.g. a server sync) flow into the draft buffer via `LaunchedEffect(item.name, isFocused)`, but only when the field is not focused, so an in-progress edit isn't overwritten. The previous "Text-swaps-to-TextField on tap" attempt was rejected because the parent `Row.draggable` was eating taps before the inner clickable could see them; the always-rendered TextField sidesteps the conflict by owning tap-to-focus itself. **Section headers intentionally keep the existing swipe → edit-icon → dialog flow** — the user asked for inline rename on items only.
+- **Section delete confirmation — DONE.** Every section-delete entry point in `SwipeableBox` (tapping the red swipe button, swiping past the auto-delete threshold mid-drag, and releasing past the trigger threshold) now funnels through a single `AlertDialog` ("Delete section? '\<name>' and all of its items will be permanently deleted."). Confirm uses `colorScheme.error` for the destructive verb; Cancel resets the row offset. Item delete still happens immediately on full swipe (matches a typical "swipe to delete a row in a list" pattern; items are cheaper to recreate than sections).
+
+### Phase 1 deferred (not in this session)
+
+- **Drag-and-drop reordering** of items within and across sections — still queued for Phase 2 per the original roadmap.
+- **Hamburger drawer content.** The dashboard's hamburger button currently routes to the Profile screen as a stub. A proper side drawer (Sign out, links to Personal/Shared/Recipes, theme toggle, etc.) is a Phase 2 polish item.
+- **Avatar stack on the Shared Lists tile.** The design shows overlapping member avatars on the Shared Lists card; that's blocked on Phase 4's friends/profiles tables. Today the tile just shows count 0.
+- **Friend-system Phase 4 dependencies.** Shared Lists is still a placeholder. The `profiles` / `friend_requests` / `friendships` / `list_members` tables haven't been created; that's all Phase 4.
 
 ## Phase 0 progress (this session)
 
@@ -286,7 +313,13 @@ list_members
 
 Reads in the Shared Lists tab join `list_members` on the current `user_id`. Editor mutations go through the same Postgrest paths as personal lists, gated by row-level security.
 
-**Real-time editing:** subscribe to `lists`, `sections`, and `items` change feeds filtered by `list_id` for every shared list the user has open. Incoming changes merge into the local state. Conflict resolution is **last-write-wins** at the row level for v1 — fine for low-frequency grocery list edits but should be flagged for revisit if jitter becomes visible.
+**Real-time editing (decided: hybrid sync).** Realtime is a *nudge*, not the source of truth. Correctness comes from the delta-pull path in §4.9; Realtime only makes it fast.
+
+- **Why not Realtime alone:** `postgres_changes` doesn't replay events missed while the socket is down (iOS backgrounding, in-store dead zones, cold start), so a catch-up fetch is required anyway. Filters cover only one column on one table, so `items` can't be filtered by list without a denormalized `list_id`. DELETE events ignore filters and, with RLS on, carry only the primary key.
+- **Why not polling alone:** meeting the <2s target (§5) would take a poll every 1–2s per open list (~30–60 mostly empty requests/min/device). Slower polling makes co-shopping feel choppy.
+- **How it works:** while a shared list is open, the client subscribes to a single channel for it (changes to `lists` / `sections` / `items` where `list_id = X`). Every event, whatever its payload, triggers a debounced delta pull through `ListSyncCoordinator`. This sidesteps the DELETE/RLS payload quirks. If the channel fails to join or drops, the client falls back to a 15–30s poll until it reconnects.
+- **Conflicts:** **last-write-wins** at the row level for v1, but writes must send **only the changed columns** (PATCH), never a full-row upsert. Otherwise one editor checking an item can clobber a simultaneous rename by another. Revisit if jitter becomes visible.
+- **Schema prerequisites:** `items.list_id` (denormalized, kept in sync with `sections.list_id`) plus the `updated_at` / `deleted_at` columns from §4.9.
 
 ### 4.8 Recipes
 
@@ -335,8 +368,9 @@ The app moves to a **local-first** model. SQLDelight is the recommended choice f
 
 - SQLDelight is the source of truth the UI reads from. Repositories expose `Flow`s backed by SQLDelight queries.
 - Writes go to SQLDelight first (synchronous, optimistic), then a sync worker pushes the change to Supabase.
-- Supabase Realtime subscriptions feed back into the local DB so other devices' changes propagate.
-- Every mutable row needs an `updated_at` timestamp; conflicts resolve by last-write-wins on that timestamp.
+- **Delta pull is the source of truth for inbound changes.** `ListSyncCoordinator` fetches rows with `updated_at > cursor` for a list, upserts them into SQLDelight, and advances a per-list cursor. It runs on list open, app foreground, reconnect, and whenever a Realtime event arrives (§4.7). Realtime only speeds this up; dropping it never loses data.
+- Every mutable row (`lists`, `sections`, `items`) needs a server-maintained `updated_at` (set by a Postgres trigger, not the client clock) and a `deleted_at` for soft deletes. Without them, deletes can't be found by a delta query. Conflicts resolve by last-write-wins on `updated_at`, with column-level PATCH writes.
+- Soft-deleted rows are hard-deleted by a periodic server-side cleanup once they're older than a retention window (e.g. 30 days).
 - Writes that fail to reach Supabase (no signal, transient error) sit in an outbox table and retry with backoff.
 
 **Implications for the existing code:** `SupabaseRepositoryImpl` becomes one half of a two-layer repository — a `LocalListRepository` (SQLDelight) and a `RemoteListRepository` (current Postgrest code), with a `ListSyncCoordinator` brokering between them. ViewModels depend only on the local repository.
@@ -377,7 +411,8 @@ These need to be answered before or during implementation:
 
 - **Friend lookup field:** email-only, username-only, or both? Usernames need a uniqueness constraint and a public `profiles` table — email lookup leaks fewer identifiers but is harder to remember.
 - **Shared list table strategy:** add an `is_shared` flag to the existing `lists` table and let `list_members` drive access, or keep a separate `shared_lists` table? The former is simpler; the latter matches the original ask. Recommendation: single `lists` table + `list_members`.
-- **Realtime scope:** subscribe per-open-list, or maintain a persistent subscription to every shared list the user is a member of? The former is cheaper; the latter enables background notifications.
+- ~~**Realtime scope:** subscribe per-open-list, or maintain a persistent subscription to every shared list the user is a member of?~~ **Decided:** per-open-list, used only as an invalidation signal that triggers a delta pull (see §4.7 / §4.9). Background awareness of other lists comes from the delta pull on app foreground. Revisit if push notifications for list activity become a requirement.
+- **Realtime transport at scale:** `postgres_changes` checks RLS for each change against each subscriber. If concurrent shared-list usage grows, switch to Broadcast-from-database triggers. Not needed at launch.
 - **Recipe parsing backend:** LLM-via-edge-function vs deterministic parser vs both? Likely both — deterministic first pass, LLM fallback for ambiguous input.
 - **Push notifications:** in-scope for friends invites, or in-app only for v1? Current plan is in-app only.
 - **Item position storage:** integer with periodic rebalancing, or `lexorank`-style strings? Integer is simpler; lexorank scales better.

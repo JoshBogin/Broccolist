@@ -1,3 +1,5 @@
+@file:OptIn(io.github.jan.supabase.annotations.SupabaseInternal::class)
+
 package com.broccolist.di
 
 import io.github.jan.supabase.auth.Auth
@@ -9,6 +11,7 @@ import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.logging.LogLevel
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.realtime.Realtime
+import io.ktor.client.plugins.HttpTimeout
 import org.koin.dsl.module
 
 /**
@@ -37,6 +40,18 @@ val supabaseModule = module {
             defaultLogLevel = LogLevel.DEBUG
             install(Postgrest)
             install(Realtime)
+            // supabase-kt creates its own internal Ktor client (separate
+            // from `HttpClientFactory.create()`), so the timeouts we set
+            // there don't apply to auth/postgrest calls. Configure them
+            // here so a no-internet sign-in surfaces a failure in ~10s
+            // instead of hanging on the default open-ended timeout.
+            httpConfig {
+                install(HttpTimeout) {
+                    connectTimeoutMillis = 10_000L
+                    socketTimeoutMillis = 15_000L
+                    requestTimeoutMillis = 15_000L
+                }
+            }
         }
     }
 }

@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class AppViewModel(
-    authApi: AuthApi,
+    private val authApi: AuthApi,
     private val guestModeRepository: GuestModeRepository,
 ) : ViewModel() {
     init {
@@ -56,5 +56,32 @@ class AppViewModel(
     /** Called from the sign-out path to drop guest state alongside Supabase. */
     fun exitGuestMode() {
         guestModeRepository.exitGuestMode()
+    }
+
+    /**
+     * Backs the "Try again" action on [SessionRefreshFailureScreen]. If the
+     * refresh succeeds, `sessionStatus` flips back to `Authenticated` and
+     * `AuthenticatedContent` swaps screens automatically. If it throws,
+     * we stay on the failure screen and the user can fall back to
+     * "Sign in again".
+     */
+    fun retrySession() {
+        viewModelScope.launch {
+            runCatching { authApi.refreshSession() }
+                .onFailure { it.printStackTrace() }
+        }
+    }
+
+    /**
+     * Backs the "Sign in again" action on [SessionRefreshFailureScreen].
+     * Signs out (drops the bad refresh token) and clears guest state so
+     * the next launch lands cleanly on Login.
+     */
+    fun signOutAndExit() {
+        guestModeRepository.exitGuestMode()
+        viewModelScope.launch {
+            runCatching { authApi.signOut() }
+                .onFailure { it.printStackTrace() }
+        }
     }
 }

@@ -6,55 +6,137 @@ import com.broccolist.checklist.domain.Section
 import com.broccolist.checklist.domain.SectionItem
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.query.Order
+import kotlinx.datetime.Clock
 
 class SupabaseRepositoryImpl(
     private val client: SupabaseClient
 ) : SupabaseRepository {
-    override suspend fun createList(userId: String) {
-        client.from("lists").insert(
-            CheckListEntity(
-                name = "New List",
-                userId = userId
-            )
-        )
-    }
-
-    override suspend fun getCheckList(userId: String): CheckList? {
-        println("===== GetCheckList: $userId =====")
-
+    override suspend fun getListsForUser(userId: String): List<CheckList> {
         return try {
-            var lists = selectListsForUser(userId)
+            val listEntities = selectListsForUser(userId)
+            val listIds = listEntities.mapNotNull { it.id }
+            if (listIds.isEmpty()) return emptyList()
 
-            println("===== Decoded Lists: ${lists.size} =====")
-            if (lists.isEmpty()) {
-                println("===== No Lists, Creating List... =====")
-                createList(userId)
-                lists = selectListsForUser(userId)
+            // Three bulk queries (lists → sections → items) instead of one
+            // per list / section, so the dashboard and Personal Lists screens
+            // get real item counts without an N+1 fan-out.
+            val sectionEntities = client.from("sections").select {
+                filter { SectionEntity::listId isIn listIds }
+            }.decodeList<SectionEntity>()
+
+            val sectionIds = sectionEntities.mapNotNull { it.id }
+            val itemsBySection = if (sectionIds.isEmpty()) {
+                emptyMap()
+            } else {
+                client.from("items").select {
+                    filter { ItemEntity::sectionId isIn sectionIds }
+                }.decodeList<ItemEntity>().groupBy { it.sectionId }
             }
 
-            lists.firstOrNull()?.let { entity ->
+            val sectionsByList = sectionEntities.groupBy { it.listId }.mapValues { (_, entities) ->
+                entities.map { entity ->
+                    Section(
+                        id = entity.id,
+                        section = GrocerySection.fromString(entity.name),
+                        items = itemsBySection[entity.id].orEmpty().map { it.toDomain() },
+                        listId = entity.listId,
+                    )
+                }
+            }
+
+            listEntities.map { entity ->
                 CheckList(
                     id = entity.id,
                     name = entity.name,
                     createdAt = entity.createdAt,
                     editedAt = entity.editedAt,
-                    sections = getSections(entity.id ?: 0),
+                    sections = sectionsByList[entity.id].orEmpty(),
                     userId = entity.userId,
                 )
             }
         } catch (e: Exception) {
-            println("===== ERROR: $e =====")
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+
+    private fun ItemEntity.toDomain() = SectionItem(
+        id = id,
+        name = name,
+        isChecked = isChecked,
+        sectionId = sectionId,
+    )
+
+    override suspend fun getListById(listId: Int): CheckList? {
+        return try {
+            val entity = client.from("lists").select {
+                filter { CheckListEntity::id eq listId }
+            }.decodeList<CheckListEntity>().firstOrNull() ?: return null
+            CheckList(
+                id = entity.id,
+                name = entity.name,
+                createdAt = entity.createdAt,
+                editedAt = entity.editedAt,
+                sections = getSections(entity.id ?: 0),
+                userId = entity.userId,
+            )
+        } catch (e: Exception) {
             e.printStackTrace()
             null
         }
     }
 
+    override suspend fun createList(name: String, userId: String): CheckList? {
+        return try {
+            val inserted = client.from("lists").insert(
+                CheckListEntity(name = name, userId = userId)
+            ) { select() }.decodeSingle<CheckListEntity>()
+            CheckList(
+                id = inserted.id,
+                name = inserted.name,
+                createdAt = inserted.createdAt,
+                editedAt = inserted.editedAt,
+                sections = emptyList(),
+                userId = inserted.userId,
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    override suspend fun renameList(listId: Int, name: String) {
+        try {
+            client.from("lists").update(
+                {
+                    CheckListEntity::name setTo name
+                    // Bumped client-side so "recently edited" ordering reflects
+                    // the rename. Phase 3 replaces this with a server trigger.
+                    CheckListEntity::editedAt setTo Clock.System.now().toString()
+                }
+            ) {
+                filter { CheckListEntity::id eq listId }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    override suspend fun deleteList(listId: Int) {
+        try {
+            client.from("lists").delete {
+                filter { CheckListEntity::id eq listId }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     private suspend fun selectListsForUser(userId: String): List<CheckListEntity> {
         return client.from("lists").select {
-            filter {
-                println("===== Filtering: $userId =====")
-                CheckListEntity::userId eq userId
-            }
+            filter { CheckListEntity::userId eq userId }
+            order("edited_at", Order.DESCENDING)
         }.decodeList<CheckListEntity>()
     }
 
